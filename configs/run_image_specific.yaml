@@ -1,0 +1,27 @@
+data:
+  id_image: "${hydra:runtime.cwd}/demo_file/Iron_man.jpg"
+  att_image: "${hydra:runtime.cwd}/demo_file/multi_people.jpg"
+  specific_id_image: "${hydra:runtime.cwd}/demo_file/specific1.png"
+  att_video: "none"
+  output_dir: ${hydra:runtime.cwd}/output
+
+pipeline:
+  face_detector_weights: "${hydra:runtime.cwd}/weights/antelope/scrfd_10g_bnkps.onnx"
+  face_id_weights: "${hydra:runtime.cwd}/weights/arcface_model/arcface_net.jit"
+  parsing_model_weights: "${hydra:runtime.cwd}/weights/parsing_model/79999_iter.pth"
+  simswap_weights: "${hydra:runtime.cwd}/weights/simswap_224/latest_net_G.pth"
+  device: "cuda"
+  crop_size: 224
+  # it seems that the official 224 checkpoint works better with 'none' face alignment type
+  checkpoint_type: "official_224" #"none
+  face_alignment_type: "none" #"ffhq"
+
+defaults:
+  - _self_
+  - override hydra/hydra_logging: disabled
+  - override hydra/job_logging: disabled
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .

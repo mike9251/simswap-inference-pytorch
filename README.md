@@ -6,7 +6,7 @@
 ***In the event of violation of the legal and ethical requirements of the user's country or region, this code repository is exempt from liability.***
 
 ## Preparation
-###Installation
+### Installation
 ```
 # clone project
 git clone https://github.com/mike9251/simswap-inference-pytorch
@@ -23,7 +23,7 @@ conda activate myenv
 pip install -r requirements.txt
 ```
 
-###Important
+### Important
 Face detection will be performed on CPU. To run it on GPU you need to install onnx gpu runtime:
 
 ```pip install onnxruntime-gpu==1.11.1```

@@ -205,6 +205,6 @@ class Generator_Adain_Upsample(nn.Module):
         if self.checkpoint_type == "official_224":
             x = (x + 1) / 2
         else:
-            x = x * self.std_imagenet + self.mean_imagenet
+            x = x * self.imagenet_std + self.imagenet_mean
 
         return x

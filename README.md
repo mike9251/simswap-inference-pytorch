@@ -103,6 +103,36 @@ Config files contain two main parts:
   - *face_alignment_type* - affects reference face key points coordinates. **Possible values are "ffhq" and "none". Try both of them to see which one works better for your data.**
 
 
+## Video
+
+<details>
+<summary><b>Official 224x224 model, face alignment "none"</b></summary>
+
+[![Video](https://i.imgur.com/iCujdRB.jpg)](https://vimeo.com/728346715)
+
+</details>
+
+<details>
+<summary><b>Official 224x224 model, face alignment "ffhq"</b></summary>
+
+[![Video](https://i.imgur.com/48hjJO4.jpg)](https://vimeo.com/728348520)
+
+</details>
+
+<details>
+<summary><b>Unofficial 512x512 model, face alignment "none"</b></summary>
+
+[![Video](https://i.imgur.com/rRltD4U.jpg)](https://vimeo.com/728346542)
+
+</details>
+
+<details>
+<summary><b>Unofficial 512x512 model, face alignment "ffhq"</b></summary>
+
+[![Video](https://i.imgur.com/gFkpyXS.jpg)](https://vimeo.com/728349219)
+
+</details>
+
 ## License
 For academic and non-commercial use only.The whole project is under the CC-BY-NC 4.0 license. See [LICENSE](https://github.com/neuralchen/SimSwap/blob/main/LICENSE) for additional details.
 

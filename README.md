@@ -28,7 +28,7 @@ Face detection will be performed on CPU. To run it on GPU you need to install on
 
 ```pip install onnxruntime-gpu==1.11.1```
 
-and modify one line of code in ```...Anaconda3\envs\sample_venv\Lib\site-packages\insightface\model_zoo\model_zoo.py```
+and modify one line of code in ```...Anaconda3\envs\myenv\Lib\site-packages\insightface\model_zoo\model_zoo.py```
 
 Here, instead of passing **None** as the second argument to the onnx inference session
 ```angular2html

@@ -1,5 +1,5 @@
-from SimSwapInference.src.DataManager.base import BaseDataManager
-from SimSwapInference.src.DataManager.utils import imread_rgb, imwrite_rgb
+from src.DataManager.base import BaseDataManager
+from src.DataManager.utils import imread_rgb, imwrite_rgb
 
 import numpy as np
 from pathlib import Path

@@ -7,10 +7,10 @@ import hydra
 from omegaconf import DictConfig
 import numpy as np
 
-from SimSwapInference.src.simswap import SimSwap
-from SimSwapInference.src.DataManager.ImageDataManager import ImageDataManager
-from SimSwapInference.src.DataManager.VideoDataManager import VideoDataManager
-from SimSwapInference.src.DataManager.utils import imread_rgb
+from src.simswap import SimSwap
+from src.DataManager.ImageDataManager import ImageDataManager
+from src.DataManager.VideoDataManager import VideoDataManager
+from src.DataManager.utils import imread_rgb
 
 
 class Application:

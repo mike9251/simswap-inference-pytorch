@@ -7,9 +7,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 
-from parsing_model.resnet import Resnet18
+from src.PostProcess.ParsingModel.resnet import Resnet18
 
-from SimSwapInference.src.PostProcess.utils import encode_segmentation_rgb_batch
+from src.PostProcess.utils import encode_segmentation_rgb_batch
 
 
 class ConvBNReLU(nn.Module):

@@ -9,13 +9,13 @@ import kornia
 import time
 from omegaconf import DictConfig
 
-from SimSwapInference.src.FaceDetector.face_detector import FaceDetector, Detection
-from SimSwapInference.src.FaceAlign.face_align import align_face, inverse_transform_batch
-from SimSwapInference.src.FaceId.faceid import FaceId
-from SimSwapInference.src.PostProcess.ParsingModel.model import BiSeNet
-from SimSwapInference.src.PostProcess.utils import SoftErosion
-from SimSwapInference.src.Generator.fs_networks_fix import Generator_Adain_Upsample as Generator_Adain_Upsample_224
-from SimSwapInference.src.Generator.fs_networks_512 import Generator_Adain_Upsample as Generator_Adain_Upsample_512
+from src.FaceDetector.face_detector import FaceDetector, Detection
+from src.FaceAlign.face_align import align_face, inverse_transform_batch
+from src.FaceId.faceid import FaceId
+from src.PostProcess.ParsingModel.model import BiSeNet
+from src.PostProcess.utils import SoftErosion
+from src.Generator.fs_networks_fix import Generator_Adain_Upsample as Generator_Adain_Upsample_224
+from src.Generator.fs_networks_512 import Generator_Adain_Upsample as Generator_Adain_Upsample_512
 
 
 def tensor2img_denorm(tensor):

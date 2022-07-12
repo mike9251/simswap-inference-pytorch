@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
-from typing import Optional, Iterable, Tuple
+from typing import Optional, Iterable, Tuple, Union
 from pathlib import Path
 from torchvision import transforms
 import kornia
@@ -100,8 +100,13 @@ class SimSwap:
         self.smooth_mask = SoftErosion(kernel_size=17, threshold=0.9, iterations=7).to(self.device)
 
     def run_detect_align(self, image: np.ndarray, for_id: bool = False) -> Tuple[
-        Iterable[np.ndarray], Iterable[np.ndarray]]:
+        Union[Iterable[np.ndarray], None], Union[Iterable[np.ndarray], None]]:
         detection: Detection = self.face_detector(image)
+
+        if detection.bbox is None:
+            if for_id:
+                raise f"Can't detect a face! Please change the ID image!"
+            return None, None
 
         kps = detection.key_points
 
@@ -127,6 +132,9 @@ class SimSwap:
 
         # for_id=False, because we want to get all faces
         align_att_imgs, att_transforms = self.run_detect_align(att_image, for_id=False)
+
+        if align_att_imgs is None and att_transforms is None:
+            return att_image
 
         # Select specific crop from the target image
         if self.specific_latent is not None:

@@ -48,13 +48,17 @@ class VideoDataManager(BaseDataManager):
 
         if img is not None:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
         return img
 
     def save(self, img: np.ndarray):
         filename = 'frame_{:0>7d}.jpg'.format(self.last_idx)
         imwrite_rgb(self.output_img_dir / filename, img)
 
-    def close(self):
+        if (self.frame_count - 1) == self.last_idx:
+            self._close()
+
+    def _close(self):
         self.video_handler.release()
 
         image_filenames = [str(x) for x in sorted(self.output_img_dir.glob("*.jpg"))]

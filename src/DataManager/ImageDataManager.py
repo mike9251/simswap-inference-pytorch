@@ -16,7 +16,8 @@ class ImageDataManager(BaseDataManager):
         if src_data.is_file():
             self.data_paths.append(src_data)
         elif src_data.is_dir():
-            self.data_paths = list(src_data.glob("*.jpg")) + list(src_data.glob("*.png"))
+            self.data_paths = list(src_data.glob("*.jpg")) + list(src_data.glob("*.jpeg")) + list(
+                src_data.glob("*.png"))
 
         assert len(self.data_paths), f'Data must be supplied!'
 
@@ -36,6 +37,3 @@ class ImageDataManager(BaseDataManager):
         filename = 'swap_' + Path(self.data_paths[self.last_idx]).name
 
         imwrite_rgb(self.output_dir / filename, img)
-
-    def close(self):
-        pass

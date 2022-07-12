@@ -55,15 +55,13 @@ class Application:
                              device=device)
 
     def run(self):
-        for i in tqdm(range(len(self.data_manager))):
+        for _ in tqdm(range(len(self.data_manager))):
 
             att_img = self.data_manager.get()
 
             output = self.model(att_img)
 
             self.data_manager.save(output)
-
-        self.data_manager.close()
 
 
 @hydra.main(config_path="configs/", config_name="run_image.yaml")

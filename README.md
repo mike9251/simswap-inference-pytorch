@@ -101,7 +101,15 @@ Config files contain two main parts:
   - *crop_size* - size of images SimSwap models works with.
   - *checkpoint_type* - the official model works with 224x224 crops and has different pre/post processings (imagenet like). Latest official repository allows you to train your own models, but the architecture and pre/post processings are slightly different (1. removed Tanh from the last layer; 2. normalization to [0...1] range). **If you run the official 224x224 model then set this parameter to "official_224", otherwise "none".**
   - *face_alignment_type* - affects reference face key points coordinates. **Possible values are "ffhq" and "none". Try both of them to see which one works better for your data.**
+  - *erosion_kernel_size* - attenuates the size of the post-processing mask. You might want to play with this parameter (**tested values are in the range [4...40]**).
 
+
+### Overriding parameters with CMD
+Every parameter in a config file can be overridden by specifying it directly with CMD. For example:
+
+```angular2html
+python app.py --config-name=run_image.yaml data.specific_id_image="path/to/the/image" pipeline.erosion_kernel_size=20
+```
 
 ## Video
 

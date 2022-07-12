@@ -50,10 +50,11 @@ class SimSwap:
         self.specific_latent = None
         self.specific_latent_match_th = 0.03
 
-        self.use_mask = use_mask
-        self.crop_size = crop_size
-        self.checkpoint_type = config.checkpoint_type
-        self.face_alignment_type = config.face_alignment_type
+        self.use_mask: bool = use_mask
+        self.crop_size: int = crop_size
+        self.checkpoint_type: str = config.checkpoint_type
+        self.face_alignment_type: str = config.face_alignment_type
+        self.erosion_kernel_size: int = config.erosion_kernel_size
         self.device = torch.device(device)
 
         # For BiSeNet and for official_224 SimSwap
@@ -195,12 +196,12 @@ class SimSwap:
         # Get np.ndarray with range [0...255]
         img_mask = tensor2img(img_mask / 255.0)
 
-        # Make it configurable
-        erosion_kernel_size = 40
-        kernel = np.ones((erosion_kernel_size, erosion_kernel_size), dtype=np.uint8)
+        kernel = np.ones((self.erosion_kernel_size, self.erosion_kernel_size), dtype=np.uint8)
         img_mask = cv2.erode(img_mask, kernel, iterations=1)
 
-        kernel_size = (41, 41)
+        delta = 1 if self.erosion_kernel_size % 2 == 0 else 0
+        kernel_size = (self.erosion_kernel_size + delta, self.erosion_kernel_size + delta)
+
         img_mask = cv2.GaussianBlur(img_mask, kernel_size, 0)
 
         # Collect all swapped crops
@@ -221,11 +222,12 @@ class SimSwap:
         # img_mask /= 255
         # # cv2.imwrite("img_mask.jpg", tensor2img(img_mask))
         #
-        # kernel = torch.ones((4, 4), dtype=torch.int, device=img_mask.device)
+        # kernel = torch.ones((self.erosion_kernel_size, self.erosion_kernel_size), dtype=torch.int, device=img_mask.device)
         # img_mask = kornia.morphology.erosion(img_mask, kernel, structuring_element=None, origin=None, border_type='geodesic', border_value=0.0, max_val=1.0, engine='unfold')
         # # cv2.imwrite("img_mask_erode.jpg", tensor2img(img_mask))
         #
-        # kernel_size = (41, 41)
+        # delta = 1 if self.erosion_kernel_size % 2 == 0 else 0
+        # kernel_size = (self.erosion_kernel_size + delta, self.erosion_kernel_size + delta)
         # sigma = 0.05
         # # Should be https://docs.opencv.org/4.x/d4/d86/group__imgproc__filter.html#gaabe8c836e97159a9193fb0b11ac52cf1
         # # https://docs.opencv.org/4.x/d4/d86/group__imgproc__filter.html#gac05a120c1ae92a6060dd0db190a61afa

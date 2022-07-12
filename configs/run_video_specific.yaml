@@ -15,6 +15,7 @@ pipeline:
   # it seems that the official 224 checkpoint works better with 'none' face alignment type
   checkpoint_type: "official_224" #"none
   face_alignment_type: "none" #"ffhq"
+  erosion_kernel_size: 4
 
 defaults:
   - _self_

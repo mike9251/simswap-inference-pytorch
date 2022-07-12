@@ -16,6 +16,8 @@ pipeline:
   checkpoint_type: "official_224" #"none
   face_alignment_type: "none" #"ffhq"
   erosion_kernel_size: 4
+  face_detector_threshold: 0.6
+  specific_latent_match_threshold: 0.05
 
 defaults:
   - _self_

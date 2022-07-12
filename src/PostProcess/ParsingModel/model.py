@@ -10,6 +10,7 @@ import torchvision
 from src.PostProcess.ParsingModel.resnet import Resnet18
 
 from src.PostProcess.utils import encode_segmentation_rgb_batch
+from typing import Tuple
 
 
 class ConvBNReLU(nn.Module):
@@ -240,18 +241,19 @@ class BiSeNet(nn.Module):
         self.conv_out32 = BiSeNetOutput(128, 64, n_classes)
         self.init_weight()
 
-    def get_mask(self, x: torch.Tensor, crop_size: int) -> torch.Tensor:
+    def get_mask(self, x: torch.Tensor, crop_size: int) -> Tuple[torch.Tensor, torch.Tensor]:
         x = F.interpolate(x, size=(512, 512))
 
         parsed_face = self.forward(x)[0]
 
         parsed_face = torch.argmax(parsed_face, dim=1, keepdim=True)
-        # print(f'parse_face_out argmax: {parse_face_out.shape}')
-        parsed_face = encode_segmentation_rgb_batch(parsed_face)
-        # print(f'parse_face_out mouth/face: {parse_face_out.shape}')
 
-        parsed_face = parsed_face[torch.sum(parsed_face, dim=[1, 2, 3]) > 5000]
-        # print(f'parse_face_out_for_postproc: {parse_face_out_for_postproc.shape}')
+        parsed_face = encode_segmentation_rgb_batch(parsed_face)
+
+        parsed_face = torch.where(torch.sum(parsed_face, dim=[1, 2, 3], keepdim=True) > 5000, parsed_face,
+                                  torch.zeros_like(parsed_face))
+
+        ignore_mask_ids = torch.sum(parsed_face, dim=[1, 2, 3]) == 0
 
         parsed_face = parsed_face.float().mul_(1 / 255.0)
 
@@ -260,7 +262,7 @@ class BiSeNet(nn.Module):
 
         parsed_face = torch.sum(parsed_face, dim=1, keepdim=True)
 
-        return parsed_face
+        return parsed_face, ignore_mask_ids
 
     def forward(self, x):
         H, W = x.size()[2:]

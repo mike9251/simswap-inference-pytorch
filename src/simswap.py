@@ -48,13 +48,14 @@ class SimSwap:
         self.id_latent = None
         self.specific_id_image: Optional[np.ndarray] = specific_image
         self.specific_latent = None
-        self.specific_latent_match_th = 0.03
 
         self.use_mask: bool = use_mask
         self.crop_size: int = crop_size
         self.checkpoint_type: str = config.checkpoint_type
         self.face_alignment_type: str = config.face_alignment_type
         self.erosion_kernel_size: int = config.erosion_kernel_size
+        self.face_detector_threshold: float = config.face_detector_threshold
+        self.specific_latent_match_th: float = config.specific_latent_match_threshold
         self.device = torch.device(device)
 
         # For BiSeNet and for official_224 SimSwap
@@ -68,7 +69,7 @@ class SimSwap:
 
         self.face_detector = FaceDetector(
             Path(config.face_detector_weights),
-            det_thresh=0.5, det_size=(640, 640), mode="ffhq", device=device)
+            det_thresh=self.face_detector_threshold, det_size=(640, 640), mode="ffhq", device=device)
 
         self.face_id_net = FaceId(Path(config.face_id_weights)).to(self.device)
 
@@ -101,13 +102,13 @@ class SimSwap:
         self.smooth_mask = SoftErosion(kernel_size=17, threshold=0.9, iterations=7).to(self.device)
 
     def run_detect_align(self, image: np.ndarray, for_id: bool = False) -> Tuple[
-        Union[Iterable[np.ndarray], None], Union[Iterable[np.ndarray], None]]:
+        Union[Iterable[np.ndarray], None], Union[Iterable[np.ndarray], None], np.ndarray]:
         detection: Detection = self.face_detector(image)
 
         if detection.bbox is None:
             if for_id:
                 raise f"Can't detect a face! Please change the ID image!"
-            return None, None
+            return None, None, detection.score
 
         kps = detection.key_points
 
@@ -119,20 +120,20 @@ class SimSwap:
         align_imgs, transforms = align_face(image, kps, crop_size=self.crop_size,
                                             mode=self.face_alignment_type)
 
-        return align_imgs, transforms
+        return align_imgs, transforms, detection.score
 
     def __call__(self, att_image: np.ndarray) -> np.ndarray:
         if self.id_latent is None:
-            align_id_imgs, id_transforms = self.run_detect_align(self.id_image, for_id=True)
+            align_id_imgs, id_transforms, _ = self.run_detect_align(self.id_image, for_id=True)
             # normalize=True, because official SimSwap model trained with normalized id_lattent
             self.id_latent: torch.Tensor = self.face_id_net(align_id_imgs, normalize=True)
 
         if self.specific_id_image is not None and self.specific_latent is None:
-            align_specific_imgs, specific_transforms = self.run_detect_align(self.specific_id_image, for_id=True)
+            align_specific_imgs, specific_transforms, _ = self.run_detect_align(self.specific_id_image, for_id=True)
             self.specific_latent: torch.Tensor = self.face_id_net(align_specific_imgs, normalize=False)
 
         # for_id=False, because we want to get all faces
-        align_att_imgs, att_transforms = self.run_detect_align(att_image, for_id=False)
+        align_att_imgs, att_transforms, att_detection_score = self.run_detect_align(att_image, for_id=False)
 
         if align_att_imgs is None and att_transforms is None:
             return att_image
@@ -143,12 +144,16 @@ class SimSwap:
             latent_dist = torch.mean(
                 F.mse_loss(att_latent, self.specific_latent.repeat(att_latent.shape[0], 1), reduction='none'), dim=-1)
 
-            min_index = torch.argmin(latent_dist)
+            att_detection_score = torch.tensor(att_detection_score, device=latent_dist.device)
+
+            min_index = torch.argmin(latent_dist * att_detection_score)
             min_value = latent_dist[min_index]
 
             if min_value < self.specific_latent_match_th:
                 align_att_imgs = [align_att_imgs[min_index]]
                 att_transforms = [att_transforms[min_index]]
+            else:
+                return att_image
 
         swapped_img: torch.Tensor = self.simswap_net(align_att_imgs, self.id_latent)
 
@@ -168,12 +173,13 @@ class SimSwap:
         inv_att_transforms: torch.Tensor = inverse_transform_batch(att_transforms)
 
         # Get face masks for the attribute image
-        face_mask = self.bise_net.get_mask(align_att_img_batch_for_parsing_model, self.crop_size)
+        face_mask, ignore_mask_ids = self.bise_net.get_mask(align_att_img_batch_for_parsing_model, self.crop_size)
 
         soft_face_mask, _ = self.smooth_mask(face_mask)
 
         # Only take face area from the swapped image
         swapped_img = swapped_img * soft_face_mask + align_att_img_batch * (1 - soft_face_mask)
+        swapped_img[ignore_mask_ids, ...] = align_att_img_batch[ignore_mask_ids, ...]
 
         frame_size = (att_image.shape[0], att_image.shape[1])
 
@@ -183,7 +189,12 @@ class SimSwap:
                                                              mode='bilinear', padding_mode='zeros',
                                                              align_corners=True, fill_value=torch.zeros(3))
 
-        img_mask = kornia.geometry.transform.warp_affine(img_white.double(), inv_att_transforms, frame_size,
+        if torch.sum(ignore_mask_ids.int()) > 0:
+            img_white = img_white.double()[ignore_mask_ids, ...]
+            inv_att_transforms = inv_att_transforms[ignore_mask_ids, ...]
+
+        img_mask = kornia.geometry.transform.warp_affine(img_white.double(), inv_att_transforms,
+                                                         frame_size,
                                                          mode='bilinear', padding_mode='zeros',
                                                          align_corners=True, fill_value=torch.zeros(3))
 

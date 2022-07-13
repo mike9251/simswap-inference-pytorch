@@ -94,7 +94,7 @@ class Generator_Adain_Upsample(nn.Module):
                  latent_size: int,
                  n_blocks: int=6,
                  deep: bool = False,
-                 checkpoint_type: str = 'none',
+                 use_last_act: bool = True,
                  norm_layer: torch.nn.Module = nn.BatchNorm2d,
                  padding_type: str = 'reflect'):
         assert (n_blocks >= 0)
@@ -103,7 +103,7 @@ class Generator_Adain_Upsample(nn.Module):
         activation = nn.ReLU(True)
 
         self.deep = deep
-        self.checkpoint_type = checkpoint_type
+        self.use_last_act = use_last_act
 
         self.to_tensor_normalize = transforms.Compose([
             transforms.ToTensor(),
@@ -159,7 +159,7 @@ class Generator_Adain_Upsample(nn.Module):
             nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(64), activation
         )
-        if self.checkpoint_type == "official_224":
+        if self.use_last_act:
             self.last_layer = nn.Sequential(nn.ReflectionPad2d(3), nn.Conv2d(64, output_nc, kernel_size=7, padding=0),
                                             torch.nn.Tanh())
         else:
@@ -173,7 +173,7 @@ class Generator_Adain_Upsample(nn.Module):
         return self
 
     def forward(self, x: Iterable[np.ndarray], dlatents: torch.Tensor):
-        if self.checkpoint_type == "official_224":
+        if self.use_last_act:
             x = [self.to_tensor(_) for _ in x]
         else:
             x = [self.to_tensor_normalize(_) for _ in x]
@@ -202,7 +202,7 @@ class Generator_Adain_Upsample(nn.Module):
         x = self.up1(x)
         x = self.last_layer(x)
 
-        if self.checkpoint_type == "official_224":
+        if self.use_last_act:
             x = (x + 1) / 2
         else:
             x = x * self.imagenet_std + self.imagenet_mean

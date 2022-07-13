@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
+from enum import Enum
 from typing import Optional, Iterable, Tuple, Union
 from pathlib import Path
 from torchvision import transforms
@@ -16,47 +17,62 @@ from src.PostProcess.ParsingModel.model import BiSeNet
 from src.PostProcess.utils import SoftErosion
 from src.Generator.fs_networks_fix import Generator_Adain_Upsample as Generator_Adain_Upsample_224
 from src.Generator.fs_networks_512 import Generator_Adain_Upsample as Generator_Adain_Upsample_512
-
-
-def tensor2img_denorm(tensor):
-    std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
-    mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
-    tensor = std * tensor.detach().cpu() + mean
-    img = tensor.numpy()
-    img = img.transpose(0, 2, 3, 1)[0]
-    img = np.clip(img * 255, 0.0, 255.0).astype(np.uint8)
-    return img
-
-
-def tensor2img(tensor):
-    tensor = tensor.detach().cpu().numpy()
-    img = tensor.transpose(0, 2, 3, 1)[0]
-    img = np.clip(img * 255, 0.0, 255.0).astype(np.uint8)
-    return img
+from src.Misc.types import CheckpointType, FaceAlignmentType
+from src.Misc.utils import tensor2img, tensor2img_denorm
 
 
 class SimSwap:
     def __init__(self,
                  config: DictConfig,
                  id_image: np.ndarray,
-                 specific_image: Optional[np.ndarray] = None,
-                 use_mask: bool = True,
-                 crop_size: int = 224,
-                 device: str = 'cpu'):
+                 specific_image: Optional[np.ndarray] = None):
 
         self.id_image: np.ndarray = id_image
         self.id_latent = None
         self.specific_id_image: Optional[np.ndarray] = specific_image
         self.specific_latent = None
 
-        self.use_mask: bool = use_mask
-        self.crop_size: int = crop_size
-        self.checkpoint_type: str = config.checkpoint_type
-        self.face_alignment_type: str = config.face_alignment_type
-        self.erosion_kernel_size: int = config.erosion_kernel_size
+        self.use_mask: bool = True
+        self.crop_size: int = config.crop_size
+        self.checkpoint_type: CheckpointType = CheckpointType(config.checkpoint_type)
+        self.face_alignment_type: FaceAlignmentType = FaceAlignmentType(config.face_alignment_type)
+        self.erode_mask_value: int = config.erode_mask_value
+        self.smooth_mask_value: int = config.smooth_mask_value
         self.face_detector_threshold: float = config.face_detector_threshold
         self.specific_latent_match_th: float = config.specific_latent_match_threshold
-        self.device = torch.device(device)
+        self.device = torch.device(config.device)
+
+        if self.crop_size < 0:
+            raise f'Invalid crop_size! Must be a positive value.'
+
+        if self.checkpoint_type not in (CheckpointType.OFFICIAL_224, CheckpointType.UNOFFICIAL):
+            raise f'Invalid checkpoint_type! Must be one of the predefined values.'
+
+        if self.face_alignment_type not in (FaceAlignmentType.FFHQ, FaceAlignmentType.DEFAULT):
+            raise f'Invalid face_alignment_type! Must be one of the predefined values.'
+
+        self.use_erosion = True
+        if self.erode_mask_value == 0:
+            self.use_erosion = False
+
+        if self.erode_mask_value < 0:
+            raise f'Invalid erode_mask_value! Must be a positive value.'
+
+        self.use_blur = True
+        if self.smooth_mask_value == 0:
+            self.use_erosion = False
+        elif self.smooth_mask_value > 0:
+            # Make sure it's odd
+            self.smooth_mask_value += 1 if self.smooth_mask_value % 2 == 0 else 0
+
+        if self.smooth_mask_value < 0:
+            raise f"Invalid smooth_mask_value! Must be a positive value."
+
+        if self.face_detector_threshold < 0.0 or self.face_detector_threshold > 1.0:
+            raise f"Invalid face_detector_threshold! Must be a positive value in range [0.0...1.0]."
+
+        if self.specific_latent_match_th < 0.0:
+            raise f"Invalid specific_latent_match_th! Must be a positive value."
 
         # For BiSeNet and for official_224 SimSwap
         self.to_tensor_normalize = transforms.Compose([
@@ -69,7 +85,7 @@ class SimSwap:
 
         self.face_detector = FaceDetector(
             Path(config.face_detector_weights),
-            det_thresh=self.face_detector_threshold, det_size=(640, 640), mode="ffhq", device=device)
+            det_thresh=self.face_detector_threshold, det_size=(640, 640), mode="ffhq", device=self.device.__str__())
 
         self.face_id_net = FaceId(Path(config.face_id_weights)).to(self.device)
 
@@ -81,7 +97,7 @@ class SimSwap:
 
         self.simswap_net = Generator_Adain_Upsample_224(input_nc=3, output_nc=3, latent_size=512, n_blocks=9,
                                                         deep=True if self.crop_size == 512 else False,
-                                                        checkpoint_type=self.checkpoint_type)
+                                                        use_last_act=True if self.checkpoint_type == CheckpointType.OFFICIAL_224 else False)
 
         # if crop_size == 224:
         #     self.simswap_net = Generator_Adain_Upsample_224(input_nc=3, output_nc=3, latent_size=512, n_blocks=9,
@@ -207,21 +223,20 @@ class SimSwap:
         # Get np.ndarray with range [0...255]
         img_mask = tensor2img(img_mask / 255.0)
 
-        kernel = np.ones((self.erosion_kernel_size, self.erosion_kernel_size), dtype=np.uint8)
-        img_mask = cv2.erode(img_mask, kernel, iterations=1)
+        if self.use_erosion:
+            kernel = np.ones((self.erode_mask_value, self.erode_mask_value), dtype=np.uint8)
+            img_mask = cv2.erode(img_mask, kernel, iterations=1)
 
-        delta = 1 if self.erosion_kernel_size % 2 == 0 else 0
-        kernel_size = (self.erosion_kernel_size + delta, self.erosion_kernel_size + delta)
-
-        img_mask = cv2.GaussianBlur(img_mask, kernel_size, 0)
+        if self.use_blur:
+            img_mask = cv2.GaussianBlur(img_mask, (self.smooth_mask_value, self.smooth_mask_value), 0)
 
         # Collect all swapped crops
         target_image = torch.sum(target_image, dim=0, keepdim=True)
         target_image = tensor2img(target_image)
 
-        img_mask = img_mask // 255
+        img_mask = np.clip(img_mask / 255, 0.0, 1.0)
 
-        result = img_mask * target_image + (1 - img_mask) * att_image
+        result = (img_mask * target_image + (1 - img_mask) * att_image).astype(np.uint8)
 
         # # torch postprocessing
         # # faster but Erosion with 40x40 kernel requires too much memory and causes OOM.

@@ -22,11 +22,6 @@ class Application:
         att_video_path = Path(config.data.att_video)
         output_dir = Path(config.data.output_dir)
 
-        device = config.pipeline.device
-
-        crop_size = config.pipeline.crop_size
-        use_mask = True
-
         assert id_image_path.exists(), f"Can't find {id_image_path} file!"
 
         self.id_image: Optional[np.ndarray] = imread_rgb(id_image_path)
@@ -49,10 +44,7 @@ class Application:
 
         self.model = SimSwap(config=config.pipeline,
                              id_image=self.id_image,
-                             specific_image=self.specific_id_image,
-                             use_mask=use_mask,
-                             crop_size=crop_size,
-                             device=device)
+                             specific_image=self.specific_id_image)
 
     def run(self):
         for _ in tqdm(range(len(self.data_manager))):

@@ -101,9 +101,34 @@ Config files contain two main parts:
   - *crop_size* - size of images SimSwap models works with.
   - *checkpoint_type* - the official model works with 224x224 crops and has different pre/post processings (imagenet like). Latest official repository allows you to train your own models, but the architecture and pre/post processings are slightly different (1. removed Tanh from the last layer; 2. normalization to [0...1] range). **If you run the official 224x224 model then set this parameter to "official_224", otherwise "none".**
   - *face_alignment_type* - affects reference face key points coordinates. **Possible values are "ffhq" and "none". Try both of them to see which one works better for your data.**
-  - *erosion_kernel_size* - attenuates the size of the post-processing mask. You might want to play with this parameter (**tested values are in the range [4...40]**).
+  - *erode_mask_value* - a non-zero value. It's used for the post-processing mask size attenuation. You might want to play with this parameter.
+  - *smooth_mask_value* - an odd non-zero value. It's used for smoothing edges of the post-processing mask. Usually is set to *erode_mask_value* + 1.
   - *face_detector_threshold* - values in range [0.0...1.0]. Higher value reduces probability of FP detections but increases the probability of FN.
   - *specific_latent_match_threshold* - values in range [0.0...inf]. Usually takes small values around 0.05.
+
+### Examples of post-processing mask
+
+<details>
+<summary><b>Effect of the erode_mask_value</b></summary>
+
+erode_mask_value = 0
+![img_mask_erode_0.jpg](Docs/pics/img_mask_erode_0.jpg "erode_mask_value = 0")
+erode_mask_value = 20
+![img_mask_erode_20.jpg](Docs/pics/img_mask_erode_20.jpg "erode_mask_value = 20")
+erode_mask_value = 40
+![img_mask_erode_40.jpg](Docs/pics/img_mask_erode_40.jpg "erode_mask_value = 40")
+</details>
+
+<details>
+<summary><b>Effect of the smooth_mask_value</b></summary>
+
+smooth_mask_value = 21
+![img_mask_blur_21.jpg](Docs/pics/img_mask_blur_21.jpg "smooth_mask_value = 21")
+smooth_mask_value = 41
+![img_mask_blur_41.jpg](Docs/pics/img_mask_blur_41.jpg "smooth_mask_value = 41")
+smooth_mask_value = 61
+![img_mask_blur_41.jpg](Docs/pics/img_mask_blur_61.jpg "smooth_mask_value = 61")
+</details>
 
 ### Overriding parameters with CMD
 Every parameter in a config file can be overridden by specifying it directly with CMD. For example:

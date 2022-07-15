@@ -134,7 +134,7 @@ class SimSwap:
             kps = kps[None, ...]
 
         align_imgs, transforms = align_face(image, kps, crop_size=self.crop_size,
-                                            mode=self.face_alignment_type)
+                                            mode='ffhq' if self.face_alignment_type == FaceAlignmentType.FFHQ else 'none')
 
         return align_imgs, transforms, detection.score
 

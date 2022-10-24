@@ -9,17 +9,20 @@ class ImageDataManager(BaseDataManager):
     def __init__(self, src_data: Path, output_dir: Path):
         self.output_dir: Path = output_dir
         self.output_dir.mkdir(exist_ok=True)
-        self.output_dir = output_dir / 'img'
+        self.output_dir = output_dir / "img"
         self.output_dir.mkdir(exist_ok=True)
 
         self.data_paths = []
         if src_data.is_file():
             self.data_paths.append(src_data)
         elif src_data.is_dir():
-            self.data_paths = list(src_data.glob("*.jpg")) + list(src_data.glob("*.jpeg")) + list(
-                src_data.glob("*.png"))
+            self.data_paths = (
+                list(src_data.glob("*.jpg"))
+                + list(src_data.glob("*.jpeg"))
+                + list(src_data.glob("*.png"))
+            )
 
-        assert len(self.data_paths), f'Data must be supplied!'
+        assert len(self.data_paths), "Data must be supplied!"
 
         self.data_paths_iter = iter(self.data_paths)
 
@@ -34,6 +37,6 @@ class ImageDataManager(BaseDataManager):
         return imread_rgb(img_path)
 
     def save(self, img: np.ndarray):
-        filename = 'swap_' + Path(self.data_paths[self.last_idx]).name
+        filename = "swap_" + Path(self.data_paths[self.last_idx]).name
 
         imwrite_rgb(self.output_dir / filename, img)

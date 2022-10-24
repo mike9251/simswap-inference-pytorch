@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 import cv2
-from moviepy.editor import AudioFileClip, VideoFileClip
+from moviepy.editor import AudioFileClip
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 
 
@@ -16,13 +16,13 @@ class VideoDataManager(BaseDataManager):
         self.audio_handler: Optional[AudioFileClip] = None
 
         self.output_dir = output_dir
-        self.output_img_dir = output_dir / 'img'
+        self.output_img_dir = output_dir / "img"
         self.output_dir.mkdir(exist_ok=True)
         self.output_img_dir.mkdir(exist_ok=True)
         self.video_name = None
 
         if src_data.is_file():
-            self.video_name = 'swap_' + src_data.name
+            self.video_name = "swap_" + src_data.name
 
             self.audio_handler = AudioFileClip(str(src_data))
             self.video_handler = cv2.VideoCapture(str(src_data))
@@ -34,7 +34,7 @@ class VideoDataManager(BaseDataManager):
 
         self.last_idx = -1
 
-        assert self.video_handler, f'Video file must be specified!'
+        assert self.video_handler, "Video file must be specified!"
 
     def __len__(self):
         return self.frame_count
@@ -52,7 +52,7 @@ class VideoDataManager(BaseDataManager):
         return img
 
     def save(self, img: np.ndarray):
-        filename = 'frame_{:0>7d}.jpg'.format(self.last_idx)
+        filename = "frame_{:0>7d}.jpg".format(self.last_idx)
         imwrite_rgb(self.output_img_dir / filename, img)
 
         if (self.frame_count - 1) == self.last_idx:
@@ -66,4 +66,4 @@ class VideoDataManager(BaseDataManager):
 
         clip = clip.set_audio(self.audio_handler)
 
-        clip.write_videofile(str(self.output_dir / self.video_name), audio_codec='aac')
+        clip.write_videofile(str(self.output_dir / self.video_name), audio_codec="aac")

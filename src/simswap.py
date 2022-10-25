@@ -8,17 +8,10 @@ from torchvision import transforms
 import kornia
 from omegaconf import DictConfig
 
-from src.FaceDetector.face_detector import FaceDetector, Detection
+from src.FaceDetector.face_detector import Detection
 from src.FaceAlign.face_align import align_face, inverse_transform_batch
-from src.FaceId.faceid import FaceId
-from src.PostProcess.ParsingModel.model import BiSeNet
 from src.PostProcess.utils import SoftErosion
-from src.Generator.fs_networks_fix import (
-    Generator_Adain_Upsample as Generator_Adain_Upsample_224,
-)
-from src.Generator.fs_networks_512 import (
-    Generator_Adain_Upsample as Generator_Adain_Upsample_512,
-)
+from src.model_loader import get_model
 from src.Misc.types import CheckpointType, FaceAlignmentType
 from src.Misc.utils import tensor2img, tensor2img_denorm
 
@@ -97,23 +90,34 @@ class SimSwap:
         # For SimSwap models trained with the updated code
         self.to_tensor = transforms.ToTensor()
 
-        self.face_detector = FaceDetector(
-            Path(config.face_detector_weights),
+        self.face_detector = get_model(
+            "face_detector",
+            device=self.device,
+            load_state_dice=False,
+            model_path=Path(config.face_detector_weights),
             det_thresh=self.face_detector_threshold,
             det_size=(640, 640),
             mode="ffhq",
-            device=self.device.__str__(),
         )
 
-        self.face_id_net = FaceId(Path(config.face_id_weights)).to(self.device)
+        self.face_id_net = get_model(
+            "arcface",
+            device=self.device,
+            load_state_dice=False,
+            model_path=Path(config.face_id_weights),
+        )
 
-        self.bise_net = BiSeNet(n_classes=19)
-        bise_net_clpt = torch.load(Path(config.parsing_model_weights))
-        self.bise_net.load_state_dict(bise_net_clpt)
-        self.bise_net = self.bise_net.to(self.device)
-        self.bise_net.eval()
+        self.bise_net = get_model(
+            "parsing_model", device=self.device, load_state_dice=True, model_path=Path(config.parsing_model_weights),
+            n_classes=19,
+        )
 
-        self.simswap_net = Generator_Adain_Upsample_224(
+        gen_model = "generator_512" if self.crop_size == 512 else "generator_224"
+        self.simswap_net = get_model(
+            gen_model,
+            device=self.device,
+            load_state_dice=True,
+            model_path=Path(config.simswap_weights),
             input_nc=3,
             output_nc=3,
             latent_size=512,
@@ -123,22 +127,6 @@ class SimSwap:
             if self.checkpoint_type == CheckpointType.OFFICIAL_224
             else False,
         )
-
-        # if crop_size == 224:
-        #     self.simswap_net = Generator_Adain_Upsample_224(input_nc=3, output_nc=3, latent_size=512, n_blocks=9,
-        #                                                     deep=False)
-        # else:
-        #     # Bottleneck is different. In the checkpoint there are BN layers, but their parameters seem to be not optimized
-        #     # running_mean = 0, running_var = 1, weights = 1, bias = 0
-        #     # self.simswap_net = Generator_Adain_Upsample_512(input_nc=3, output_nc=3, latent_size=512, n_blocks=9,
-        #     #                                                 deep=False)
-        #     self.simswap_net = Generator_Adain_Upsample_512(input_nc=3, output_nc=3, latent_size=512, n_blocks=9,
-        #                                                     deep=False)
-
-        simswap_net_ckpt = torch.load(Path(config.simswap_weights))
-        self.simswap_net.load_state_dict(simswap_net_ckpt)
-        self.simswap_net = self.simswap_net.to(self.device)
-        self.simswap_net.eval()
 
         self.smooth_mask = SoftErosion(kernel_size=17, threshold=0.9, iterations=7).to(
             self.device

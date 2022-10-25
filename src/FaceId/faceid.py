@@ -9,11 +9,13 @@ from pathlib import Path
 
 
 class FaceId(torch.nn.Module):
-    def __init__(self, arcnet_path: Path, input_shape: Iterable[int] = (112, 112)):
+    def __init__(
+        self, model_path: Path, device: str, input_shape: Iterable[int] = (112, 112)
+    ):
         super().__init__()
 
         self.input_shape = input_shape
-        self.net = torch.load(arcnet_path, map_location=torch.device("cpu"))
+        self.net = torch.load(model_path, map_location=torch.device("cpu"))
         self.net.eval()
 
         self.transform = transforms.Compose(
@@ -28,12 +30,8 @@ class FaceId(torch.nn.Module):
                 not p.requires_grad
             ), f"Parameter {n}: requires_grad: {p.requires_grad}"
 
-        self.device = torch.device("cpu")
-
-    def to(self, device):
-        super().to(device)
-        self.device = device
-        return self
+        self.device = torch.device(device)
+        self.to(self.device)
 
     def forward(
         self, img_id: Union[np.ndarray, Iterable[np.ndarray]], normalize: bool = True

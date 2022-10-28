@@ -36,7 +36,13 @@ models = {
 }
 
 
-def get_model(model_name: str, device: torch.device, load_state_dice: bool, model_path: Path, **kwargs):
+def get_model(
+    model_name: str,
+    device: torch.device,
+    load_state_dice: bool,
+    model_path: Path,
+    **kwargs,
+):
     dst_dir = Path.cwd() / "weights"
     dst_dir.mkdir(exist_ok=True)
 

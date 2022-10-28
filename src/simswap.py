@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
-from typing import Optional, Iterable, Tuple, Union
+from typing import Iterable, Tuple, Union
 from pathlib import Path
 from torchvision import transforms
 import kornia
@@ -20,64 +20,34 @@ class SimSwap:
     def __init__(
         self,
         config: DictConfig,
-        id_image: np.ndarray,
-        specific_image: Optional[np.ndarray] = None,
+        id_image: Union[np.ndarray, None] = None,
+        specific_image: Union[np.ndarray, None] = None,
     ):
 
-        self.id_image: np.ndarray = id_image
-        self.id_latent = None
-        self.specific_id_image: Optional[np.ndarray] = specific_image
-        self.specific_latent = None
+        self.id_image: np.ndarray | None = id_image
+        self.id_latent: torch.Tensor | None = None
+        self.specific_id_image: np.ndarray | None = specific_image
+        self.specific_latent: torch.Tensor | None = None
 
-        self.use_mask: bool = True
-        self.crop_size: int = config.crop_size
-        self.checkpoint_type: CheckpointType = CheckpointType(config.checkpoint_type)
-        self.face_alignment_type: FaceAlignmentType = FaceAlignmentType(
-            config.face_alignment_type
-        )
-        self.erode_mask_value: int = config.erode_mask_value
-        self.smooth_mask_value: int = config.smooth_mask_value
-        self.face_detector_threshold: float = config.face_detector_threshold
-        self.specific_latent_match_th: float = config.specific_latent_match_threshold
+        self.use_mask: Union[bool, None] = True
+        self.crop_size: Union[int, None] = None
+        self.checkpoint_type: Union[CheckpointType, None] = None
+        self.face_alignment_type: Union[FaceAlignmentType, None] = None
+        self.erode_mask_value: Union[int, None] = None
+        self.smooth_mask_value: Union[int, None] = None
+        self.face_detector_threshold: Union[float, None] = None
+        self.specific_latent_match_threshold: Union[float, None] = None
         self.device = torch.device(config.device)
 
-        if self.crop_size < 0:
-            raise "Invalid crop_size! Must be a positive value."
-
-        if self.checkpoint_type not in (
-            CheckpointType.OFFICIAL_224,
-            CheckpointType.UNOFFICIAL,
-        ):
-            raise "Invalid checkpoint_type! Must be one of the predefined values."
-
-        if self.face_alignment_type not in (
-            FaceAlignmentType.FFHQ,
-            FaceAlignmentType.DEFAULT,
-        ):
-            raise "Invalid face_alignment_type! Must be one of the predefined values."
+        self.set_parameters(config)
 
         self.use_erosion = True
         if self.erode_mask_value == 0:
             self.use_erosion = False
 
-        if self.erode_mask_value < 0:
-            raise "Invalid erode_mask_value! Must be a positive value."
-
         self.use_blur = True
         if self.smooth_mask_value == 0:
             self.use_erosion = False
-        elif self.smooth_mask_value > 0:
-            # Make sure it's odd
-            self.smooth_mask_value += 1 if self.smooth_mask_value % 2 == 0 else 0
-
-        if self.smooth_mask_value < 0:
-            raise "Invalid smooth_mask_value! Must be a positive value."
-
-        if self.face_detector_threshold < 0.0 or self.face_detector_threshold > 1.0:
-            raise "Invalid face_detector_threshold! Must be a positive value in range [0.0...1.0]."
-
-        if self.specific_latent_match_th < 0.0:
-            raise "Invalid specific_latent_match_th! Must be a positive value."
 
         # For BiSeNet and for official_224 SimSwap
         self.to_tensor_normalize = transforms.Compose(
@@ -108,7 +78,10 @@ class SimSwap:
         )
 
         self.bise_net = get_model(
-            "parsing_model", device=self.device, load_state_dice=True, model_path=Path(config.parsing_model_weights),
+            "parsing_model",
+            device=self.device,
+            load_state_dice=True,
+            model_path=Path(config.parsing_model_weights),
             n_classes=19,
         )
 
@@ -131,6 +104,66 @@ class SimSwap:
         self.smooth_mask = SoftErosion(kernel_size=17, threshold=0.9, iterations=7).to(
             self.device
         )
+
+    def set_parameters(self, config) -> None:
+        self.set_crop_size(config.crop_size)
+        self.set_checkpoint_type(config.checkpoint_type)
+        self.set_face_alignment_type(config.face_alignment_type)
+        self.set_face_detector_threshold(config.face_detector_threshold)
+        self.set_specific_latent_match_threshold(config.specific_latent_match_threshold)
+        self.set_erode_mask_value(config.erode_mask_value)
+        self.set_smooth_mask_value(config.smooth_mask_value)
+
+    def set_crop_size(self, crop_size: int) -> None:
+        if crop_size < 0:
+            raise "Invalid crop_size! Must be a positive value."
+
+        self.crop_size = crop_size
+
+    def set_checkpoint_type(self, checkpoint_type: str) -> None:
+        type = CheckpointType(checkpoint_type)
+        if type not in (CheckpointType.OFFICIAL_224, CheckpointType.UNOFFICIAL):
+            raise "Invalid checkpoint_type! Must be one of the predefined values."
+
+        self.checkpoint_type = type
+
+    def set_face_alignment_type(self, face_alignment_type: str) -> None:
+        type = FaceAlignmentType(face_alignment_type)
+        if type not in (
+            FaceAlignmentType.FFHQ,
+            FaceAlignmentType.DEFAULT,
+        ):
+            raise "Invalid face_alignment_type! Must be one of the predefined values."
+
+        self.face_alignment_type = type
+
+    def set_face_detector_threshold(self, face_detector_threshold: float) -> None:
+        if face_detector_threshold < 0.0 or face_detector_threshold > 1.0:
+            raise "Invalid face_detector_threshold! Must be a positive value in range [0.0...1.0]."
+
+        self.face_detector_threshold = face_detector_threshold
+
+    def set_specific_latent_match_threshold(
+        self, specific_latent_match_threshold: float
+    ) -> None:
+        if specific_latent_match_threshold < 0.0:
+            raise "Invalid specific_latent_match_th! Must be a positive value."
+
+        self.specific_latent_match_threshold = specific_latent_match_threshold
+
+    def set_erode_mask_value(self, erode_mask_value: int) -> None:
+        if erode_mask_value < 0:
+            raise "Invalid erode_mask_value! Must be a positive value."
+
+        self.erode_mask_value = erode_mask_value
+
+    def set_smooth_mask_value(self, smooth_mask_value: int) -> None:
+        if smooth_mask_value < 0:
+            raise "Invalid smooth_mask_value! Must be a positive value."
+
+        smooth_mask_value += 1 if smooth_mask_value % 2 == 0 else 0
+
+        self.smooth_mask_value = smooth_mask_value
 
     def run_detect_align(
         self, image: np.ndarray, for_id: bool = False
@@ -207,7 +240,7 @@ class SimSwap:
             min_index = torch.argmin(latent_dist * att_detection_score)
             min_value = latent_dist[min_index]
 
-            if min_value < self.specific_latent_match_th:
+            if min_value < self.specific_latent_match_threshold:
                 align_att_imgs = [align_att_imgs[min_index]]
                 att_transforms = [att_transforms[min_index]]
             else:

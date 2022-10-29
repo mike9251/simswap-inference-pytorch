@@ -65,6 +65,12 @@ Download the archive with weights <a href="https://drive.google.com/file/d/1Lhh2
 - weights/simswap_512/390000_net_G.pth - unofficial 512x512 model (I took it <a href="https://github.com/neuralchen/SimSwap/issues/255">here</a>).
 
 ## Inference
+### Web App
+```angular2html
+streamlit run app_web.py
+```
+
+### Command line App
 This repository supports inference in several modes, which can be easily configured with config files in the **configs** folder.
 - **replace all faces on a target image / folder with images**
 ```angular2html

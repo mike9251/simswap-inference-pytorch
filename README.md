@@ -1,5 +1,9 @@
 # Unofficial Pytorch implementation (**inference only**) of the SimSwap: An Efficient Framework For High Fidelity Face Swapping
 
+## Updates
+- added support for using GFPGAN model as an additional post-processing step to improve final image quality
+- added a toy gui app. Might be useful to understand how different pipeline settings affect output
+
 ## Attention
 ***This project is for technical and academic use only. Please do not apply it to illegal and unethical scenarios.***
 
@@ -55,14 +59,14 @@ Otherwise simply use CPU onnx runtime with only a minor performance drop.
 ### Weights
 #### Weights for all models get downloaded automatically.
 
-But you can go the old way:\
-Download the archive with weights <a href="https://drive.google.com/file/d/1Lhh24Isxriuv2rAgPK_vnpLAsJ3u2bZk/view?usp=sharing">here</a> and extract it inside the repository folder. 
+You can also download weights manually and put inside `weights` folder:
 
-- weights/antelope/scrfd_10g_bnkps.onnx
-- weights/arcface_model/arcface_net.jit
-- weights/parsing_model/79999_iter.pth
-- weights/simswap_224/latest_net_G.pth - official 224x224 model
-- weights/simswap_512/390000_net_G.pth - unofficial 512x512 model (I took it <a href="https://github.com/neuralchen/SimSwap/issues/255">here</a>).
+- weights/<a href="https://github.com/mike9251/simswap-inference-pytorch/releases/download/weights/face_detector_scrfd_10g_bnkps.onnx">face_detector_scrfd_10g_bnkps.onnx</a>
+- weights/<a href="https://github.com/mike9251/simswap-inference-pytorch/releases/download/weights/arcface_net.jit">arcface_net.jit</a>
+- weights/<a href="https://github.com/mike9251/simswap-inference-pytorch/releases/download/weights/parsing_model_79999_iter.pth">79999_iter.pth</a>
+- weights/<a href="https://github.com/mike9251/simswap-inference-pytorch/releases/download/weights/simswap_224_latest_net_G.pth">simswap_224_latest_net_G.pth</a> - official 224x224 model
+- weights/<a href="https://github.com/mike9251/simswap-inference-pytorch/releases/download/weights/simswap_512_390000_net_G.pth">simswap_512_390000_net_G.pth</a> - unofficial 512x512 model (I took it <a href="https://github.com/neuralchen/SimSwap/issues/255">here</a>).
+- weights/<a href="https://github.com/mike9251/simswap-inference-pytorch/releases/download/v1.1/GFPGANv1.4_ema.pth">GFPGANv1.4_ema.pth</a>
 
 ## Inference
 ### Web App
@@ -114,6 +118,7 @@ Config files contain two main parts:
   - *smooth_mask_value* - an odd non-zero value. It's used for smoothing edges of the post-processing mask. Usually is set to *erode_mask_value* + 1.
   - *face_detector_threshold* - values in range [0.0...1.0]. Higher value reduces probability of FP detections but increases the probability of FN.
   - *specific_latent_match_threshold* - values in range [0.0...inf]. Usually takes small values around 0.05.
+  - *enhance_output* - whether apply GFPGAN model or not as a post-processing step.
 
 ### Examples of post-processing mask
 
@@ -186,4 +191,5 @@ For academic and non-commercial use only.The whole project is under the CC-BY-NC
 * [Insightface](https://github.com/deepinsight/insightface)
 * [Face-parsing.PyTorch](https://github.com/zllrunning/face-parsing.PyTorch)
 * [BiSeNet](https://github.com/CoinCheung/BiSeNet)
+* [GFPGAN](https://github.com/TencentARC/GFPGAN)
 <!--te-->

@@ -6,10 +6,11 @@ data:
   output_dir: ${hydra:runtime.cwd}/output
 
 pipeline:
-  face_detector_weights: "${hydra:runtime.cwd}/weights/antelope/scrfd_10g_bnkps.onnx"
-  face_id_weights: "${hydra:runtime.cwd}/weights/arcface_model/arcface_net.jit"
-  parsing_model_weights: "${hydra:runtime.cwd}/weights/parsing_model/79999_iter.pth"
-  simswap_weights: "${hydra:runtime.cwd}/weights/simswap_224/latest_net_G.pth"
+  face_detector_weights: "${hydra:runtime.cwd}/weights/face_detector_scrfd_10g_bnkps.onnx"
+  face_id_weights: "${hydra:runtime.cwd}/weights/arcface_net.jit"
+  parsing_model_weights: "${hydra:runtime.cwd}/weights/79999_iter.pth"
+  simswap_weights: "${hydra:runtime.cwd}/weights/simswap_224_latest_net_G.pth"
+  gfpgan_weights: "${hydra:runtime.cwd}/weights/GFPGANv1.4_ema.pth"
   device: "cuda"
   crop_size: 224
   # it seems that the official 224 checkpoint works better with 'none' face alignment type
@@ -19,6 +20,7 @@ pipeline:
   smooth_mask_value: 41
   face_detector_threshold: 0.6
   specific_latent_match_threshold: 0.05
+  enhance_output: True
 
 defaults:
   - _self_

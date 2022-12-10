@@ -3,17 +3,17 @@ from src.DataManager.utils import imwrite_rgb
 
 import numpy as np
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 import cv2
-from moviepy.editor import AudioFileClip
+from moviepy.editor import AudioFileClip, VideoFileClip
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 
 
 class VideoDataManager(BaseDataManager):
     def __init__(self, src_data: Path, output_dir: Path):
-        self.video_handler: Optional[cv2.VideoCapture] = None
-        self.audio_handler: Optional[AudioFileClip] = None
+        self.video_handle: Optional[VideoFileClip] = None
+        self.audio_handle: Optional[AudioFileClip] = None
 
         self.output_dir = output_dir
         self.output_img_dir = output_dir / "img"
@@ -24,31 +24,21 @@ class VideoDataManager(BaseDataManager):
         if src_data.is_file():
             self.video_name = "swap_" + src_data.name
 
-            self.audio_handler = AudioFileClip(str(src_data))
-            self.video_handler = cv2.VideoCapture(str(src_data))
-
-            self.frame_count = int(self.video_handler.get(cv2.CAP_PROP_FRAME_COUNT))
-            # video_WIDTH = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
-            # video_HEIGHT = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            self.fps = self.video_handler.get(cv2.CAP_PROP_FPS)
+            self.audio_handle = AudioFileClip(str(src_data))
+            self.video_handle = VideoFileClip(str(src_data))
+            self.fps = self.video_handle.reader.fps
+            self.frame_count = self.video_handle.reader.nframes
+            self.data_iterator = zip(range(self.frame_count), self.video_handle.iter_frames())
 
         self.last_idx = -1
 
-        assert self.video_handler, "Video file must be specified!"
+        assert self.video_handle, "Video file must be specified!"
 
     def __len__(self):
         return self.frame_count
 
     def get(self) -> np.ndarray:
-        img: Union[None, np.ndarray] = None
-
-        while img is None and self.last_idx < self.frame_count:
-            status, img = self.video_handler.read()
-            self.last_idx += 1
-
-        if img is not None:
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
+        self.last_idx, img = next(self.data_iterator)
         return img
 
     def save(self, img: np.ndarray):
@@ -59,11 +49,9 @@ class VideoDataManager(BaseDataManager):
             self._close()
 
     def _close(self):
-        self.video_handler.release()
-
         image_filenames = [str(x) for x in sorted(self.output_img_dir.glob("*.jpg"))]
         clip = ImageSequenceClip(image_filenames, fps=self.fps)
 
-        clip = clip.set_audio(self.audio_handler)
+        clip = clip.set_audio(self.audio_handle)
 
         clip.write_videofile(str(self.output_dir / self.video_name), audio_codec="aac")

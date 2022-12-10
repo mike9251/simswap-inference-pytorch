@@ -11,6 +11,7 @@ from omegaconf import DictConfig
 from src.FaceDetector.face_detector import Detection
 from src.FaceAlign.face_align import align_face, inverse_transform_batch
 from src.PostProcess.utils import SoftErosion
+from src.PostProcess.GFPGAN.gfpgan import GFPGANer
 from src.model_loader import get_model
 from src.Misc.types import CheckpointType, FaceAlignmentType
 from src.Misc.utils import tensor2img, tensor2img_denorm
@@ -104,6 +105,15 @@ class SimSwap:
         self.smooth_mask = SoftErosion(kernel_size=17, threshold=0.9, iterations=7).to(
             self.device
         )
+
+        self.gfpgan_net = None
+        if config.enhance_output:
+            self.gfpgan_net = get_model(
+                "gfpgan",
+                device=self.device,
+                load_state_dice=True,
+                model_path=Path(config.gfpgan_weights)
+            )
 
     def set_parameters(self, config) -> None:
         self.set_crop_size(config.crop_size)
@@ -247,6 +257,9 @@ class SimSwap:
                 return att_image
 
         swapped_img: torch.Tensor = self.simswap_net(align_att_imgs, self.id_latent)
+
+        if self.gfpgan_net is not None:
+            swapped_img = self.gfpgan_net.enhance(swapped_img, weight=0.5)
 
         # Put all crops/transformations into a batch
         align_att_img_batch_for_parsing_model: torch.Tensor = torch.stack(

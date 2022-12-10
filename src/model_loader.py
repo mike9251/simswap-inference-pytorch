@@ -9,6 +9,7 @@ from src.FaceDetector.face_detector import FaceDetector
 from src.FaceId.faceid import FaceId
 from src.Generator.fs_networks_fix import Generator_Adain_Upsample
 from src.PostProcess.ParsingModel.model import BiSeNet
+from src.PostProcess.GFPGAN.gfpgan import GFPGANer
 
 model = namedtuple("model", ["url", "model"])
 
@@ -33,15 +34,19 @@ models = {
         url="https://github.com/mike9251/simswap-inference-pytorch/releases/download/weights/parsing_model_79999_iter.pth",
         model=BiSeNet,
     ),
+    "gfpgan": model(
+        url="https://github.com/mike9251/simswap-inference-pytorch/releases/download/v1.1/GFPGANv1.4_ema.pth",
+        model=GFPGANer,
+    ),
 }
 
 
 def get_model(
-    model_name: str,
-    device: torch.device,
-    load_state_dice: bool,
-    model_path: Path,
-    **kwargs,
+        model_name: str,
+        device: torch.device,
+        load_state_dice: bool,
+        model_path: Path,
+        **kwargs,
 ):
     dst_dir = Path.cwd() / "weights"
     dst_dir.mkdir(exist_ok=True)
@@ -75,14 +80,14 @@ def get_model(
             print(f"Downloading: '{url}' to {dst_path}")
             response = requests.get(url, stream=True)
             if int(response.status_code) == 200:
-                file_size = int(response.headers["Content-Length"]) / (2**20)
+                file_size = int(response.headers["Content-Length"]) / (2 ** 20)
                 chunk_size = 1024
                 bar_format = "{desc}: {percentage:3.0f}%|{bar}| {n:3.1f}M/{total:3.1f}M [{elapsed}<{remaining}]"
                 with open(dst_path, "wb") as handle:
                     with tqdm(total=file_size, bar_format=bar_format) as pbar:
                         for data in response.iter_content(chunk_size=chunk_size):
                             handle.write(data)
-                            pbar.update(len(data) / (2**20))
+                            pbar.update(len(data) / (2 ** 20))
             else:
                 raise ValueError(
                     f"Couldn't download weights {url}. Specify weights for the '{model_name}' model manually."

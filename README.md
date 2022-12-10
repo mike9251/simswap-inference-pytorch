@@ -110,6 +110,7 @@ Config files contain two main parts:
   - *face_id_weights* - path to the weights file OR an empty string ("") for automatic weights downloading.
   - *parsing_model_weights* - path to the weights file OR an empty string ("") for automatic weights downloading.
   - *simswap_weights* - path to the weights file OR an empty string ("") for automatic weights downloading.
+  - *gfpgan_weights* - path to the weights file OR an empty string ("") for automatic weights downloading.
   - *device* - whether you want to run the application using GPU or CPU.
   - *crop_size* - size of images SimSwap models works with.
   - *checkpoint_type* - the official model works with 224x224 crops and has different pre/post processings (imagenet like). Latest official repository allows you to train your own models, but the architecture and pre/post processings are slightly different (1. removed Tanh from the last layer; 2. normalization to [0...1] range). **If you run the official 224x224 model then set this parameter to "official_224", otherwise "none".**

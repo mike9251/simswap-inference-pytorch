@@ -11,10 +11,9 @@ from omegaconf import DictConfig
 from src.FaceDetector.face_detector import Detection
 from src.FaceAlign.face_align import align_face, inverse_transform_batch
 from src.PostProcess.utils import SoftErosion
-from src.PostProcess.GFPGAN.gfpgan import GFPGANer
 from src.model_loader import get_model
 from src.Misc.types import CheckpointType, FaceAlignmentType
-from src.Misc.utils import tensor2img, tensor2img_denorm
+from src.Misc.utils import tensor2img
 
 
 class SimSwap:
@@ -106,7 +105,7 @@ class SimSwap:
             self.device
         )
 
-        self.gfpgan_net = None
+        self.enhance_output = config.enhance_output
         if config.enhance_output:
             self.gfpgan_net = get_model(
                 "gfpgan",
@@ -175,11 +174,9 @@ class SimSwap:
 
         self.smooth_mask_value = smooth_mask_value
 
-    def run_detect_align(
-        self, image: np.ndarray, for_id: bool = False
-    ) -> Tuple[
-        Union[Iterable[np.ndarray], None], Union[Iterable[np.ndarray], None], np.ndarray
-    ]:
+    def run_detect_align(self, image: np.ndarray, for_id: bool = False) -> Tuple[Union[Iterable[np.ndarray], None],
+                                                                                 Union[Iterable[np.ndarray], None],
+                                                                                 np.ndarray]:
         detection: Detection = self.face_detector(image)
 
         if detection.bbox is None:
@@ -258,7 +255,7 @@ class SimSwap:
 
         swapped_img: torch.Tensor = self.simswap_net(align_att_imgs, self.id_latent)
 
-        if self.gfpgan_net is not None:
+        if self.enhance_output:
             swapped_img = self.gfpgan_net.enhance(swapped_img, weight=0.5)
 
         # Put all crops/transformations into a batch
@@ -270,16 +267,17 @@ class SimSwap:
         )
 
         att_transforms: torch.Tensor = torch.stack(
-            [torch.tensor(x) for x in att_transforms], dim=0
+            [torch.tensor(x).float() for x in att_transforms], dim=0
         )
-        att_transforms = att_transforms.to(self.device)
+        att_transforms = att_transforms.to(self.device, non_blocking=True)
 
         align_att_img_batch: torch.Tensor = torch.stack(
             [self.to_tensor(x) for x in align_att_imgs], dim=0
         )
-        align_att_img_batch = align_att_img_batch.to(self.device)
+        align_att_img_batch = align_att_img_batch.to(self.device, non_blocking=True)
 
-        img_white = torch.zeros_like(align_att_img_batch) + 255
+        n, c, h, w = align_att_img_batch.shape
+        img_white = torch.zeros((n, 1, h, w), dtype=align_att_img_batch.dtype, device=self.device) + 255.0
 
         inv_att_transforms: torch.Tensor = inverse_transform_batch(att_transforms)
 
@@ -298,23 +296,24 @@ class SimSwap:
 
         frame_size = (att_image.shape[0], att_image.shape[1])
 
-        # Place swapped faces and masks where they should be in the original frame
-        target_image = kornia.geometry.transform.warp_affine(
-            swapped_img.double(),
-            inv_att_transforms,
-            frame_size,
-            mode="bilinear",
-            padding_mode="zeros",
-            align_corners=True,
-            fill_value=torch.zeros(3),
-        )
+        att_image = self.to_tensor(att_image).to(self.device, non_blocking=True)
 
         if torch.sum(ignore_mask_ids.int()) > 0:
-            img_white = img_white.double()[ignore_mask_ids, ...]
+            img_white = img_white[ignore_mask_ids, ...]
             inv_att_transforms = inv_att_transforms[ignore_mask_ids, ...]
 
-        img_mask = kornia.geometry.transform.warp_affine(
-            img_white.double(),
+        # to avoid OOM apply erosion on low res masks
+        img_white = F.pad(img_white, (self.erode_mask_value, self.erode_mask_value, self.erode_mask_value, self.erode_mask_value))
+
+        if self.use_erosion:
+            kernel = torch.ones((self.erode_mask_value, self.erode_mask_value), dtype=torch.float32, device=self.device)
+            img_white = kornia.morphology.erosion(img_white, kernel, structuring_element=None, origin=None, border_type='geodesic', border_value=0.0, max_val=255.0, engine='convolution')
+
+        img_white = img_white[:, :, self.erode_mask_value:-self.erode_mask_value, self.erode_mask_value:-self.erode_mask_value]
+
+        # Place swapped faces and masks where they should be in the original frame
+        target_image = kornia.geometry.transform.warp_affine(
+            swapped_img,
             inv_att_transforms,
             frame_size,
             mode="bilinear",
@@ -323,60 +322,33 @@ class SimSwap:
             fill_value=torch.zeros(3),
         )
 
-        img_mask[img_mask > 20] = 255
+        img_mask = kornia.geometry.transform.warp_affine(
+            img_white,
+            inv_att_transforms,
+            frame_size,
+            mode="bilinear",
+            padding_mode="zeros",
+            align_corners=True,
+            fill_value=torch.zeros(3),
+        )
 
-        # numpy postprocessing
+        if self.use_blur:
+            kernel_size = (self.smooth_mask_value, self.smooth_mask_value)
+            # https://docs.opencv.org/4.x/d4/d86/group__imgproc__filter.html#gaabe8c836e97159a9193fb0b11ac52cf1
+            # https://docs.opencv.org/4.x/d4/d86/group__imgproc__filter.html#gac05a120c1ae92a6060dd0db190a61afa
+            sigma = 2 * 0.3 * ((kernel_size[0] - 1) * 0.5 - 1) + 0.8
+            img_mask = kornia.filters.gaussian_blur2d(img_mask, kernel_size, (sigma, sigma), border_type='constant',
+                                                      separable=True)
+
         # Collect masks for all crops
         img_mask = torch.sum(img_mask, dim=0, keepdim=True)
 
-        # Get np.ndarray with range [0...255]
-        img_mask = tensor2img(img_mask / 255.0)
-
-        if self.use_erosion:
-            kernel = np.ones(
-                (self.erode_mask_value, self.erode_mask_value), dtype=np.uint8
-            )
-            img_mask = cv2.erode(img_mask, kernel, iterations=1)
-
-        if self.use_blur:
-            img_mask = cv2.GaussianBlur(
-                img_mask, (self.smooth_mask_value, self.smooth_mask_value), 0
-            )
+        img_mask /= 255.0
+        img_mask = torch.clamp(img_mask, 0.0, 1.0)
 
         # Collect all swapped crops
         target_image = torch.sum(target_image, dim=0, keepdim=True)
-        target_image = tensor2img(target_image)
 
-        img_mask = np.clip(img_mask / 255, 0.0, 1.0)
-
-        result = (img_mask * target_image + (1 - img_mask) * att_image).astype(np.uint8)
-
-        # # torch postprocessing
-        # # faster but Erosion with 40x40 kernel requires too much memory and causes OOM.
-        # # Using smaller kernel sometimes causes visual artifacts along the mask border
-        #
-        # # Collect masks for all crops
-        # img_mask = torch.sum(img_mask, dim=0, keepdim=True)
-        #
-        # img_mask /= 255
-        # # cv2.imwrite("img_mask.jpg", tensor2img(img_mask))
-        #
-        # kernel = torch.ones((self.erosion_kernel_size, self.erosion_kernel_size), dtype=torch.int, device=img_mask.device)
-        # img_mask = kornia.morphology.erosion(img_mask, kernel, structuring_element=None, origin=None, border_type='geodesic', border_value=0.0, max_val=1.0, engine='unfold')
-        # # cv2.imwrite("img_mask_erode.jpg", tensor2img(img_mask))
-        #
-        # delta = 1 if self.erosion_kernel_size % 2 == 0 else 0
-        # kernel_size = (self.erosion_kernel_size + delta, self.erosion_kernel_size + delta)
-        # sigma = 0.05
-        # # Should be https://docs.opencv.org/4.x/d4/d86/group__imgproc__filter.html#gaabe8c836e97159a9193fb0b11ac52cf1
-        # # https://docs.opencv.org/4.x/d4/d86/group__imgproc__filter.html#gac05a120c1ae92a6060dd0db190a61afa
-        # # sigma = 0.3 * ((kernel_size[0] - 1) * 0.5 - 1) + 0.8
-        # img_mask = kornia.filters.gaussian_blur2d(img_mask, kernel_size, (sigma, sigma), border_type='reflect', separable=True)
-        # # cv2.imwrite("img_mask_gaus.jpg", tensor2img(img_mask))
-        #
-        # # Collect all swapped crops
-        # target_image = torch.sum(target_image, dim=0, keepdim=True)
-        #
-        # result = tensor2img(img_mask * target_image + (1 - img_mask) * self.to_tensor(att_image).to(self.device))
+        result = tensor2img(img_mask * target_image + (1 - img_mask) * att_image)
 
         return result

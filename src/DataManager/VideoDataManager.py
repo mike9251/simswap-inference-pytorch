@@ -5,7 +5,6 @@ import numpy as np
 from pathlib import Path
 from typing import Optional
 
-import cv2
 from moviepy.editor import AudioFileClip, VideoFileClip
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 

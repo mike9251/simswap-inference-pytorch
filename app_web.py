@@ -31,12 +31,14 @@ def run(model):
 
         face_alignment_type = st.radio("Face alignment type:", ("none", "ffhq"))
 
+        enhance_output = st.radio("Enhance output:", ("yes", "no"))
+
         erode_mask_value = st.slider(
-            label="erode_mask_value", min_value=3, max_value=99, step=1, value=40
+            label="erode_mask_value", min_value=3, max_value=60, step=1, value=40
         )
 
         smooth_mask_value = st.slider(
-            label="smooth_mask_value", min_value=1, max_value=99, step=2, value=41
+            label="smooth_mask_value", min_value=1, max_value=61, step=2, value=41
         )
 
         specific_latent_match_threshold = st.slider(
@@ -74,6 +76,7 @@ def run(model):
         model.set_erode_mask_value(erode_mask_value)
         model.set_smooth_mask_value(smooth_mask_value)
         model.set_specific_latent_match_threshold(specific_latent_match_threshold)
+        model.enhance_output = True if enhance_output == "yes" else False
 
         model.specific_latent = None
         model.specific_id_image = specific_image if specific_image is not None else None
@@ -116,6 +119,7 @@ Config = namedtuple(
     + " face_id_weights"
     + " parsing_model_weights"
     + " simswap_weights"
+    + " gfpgan_weights"
     + " device"
     + " crop_size"
     + " checkpoint_type"
@@ -123,7 +127,8 @@ Config = namedtuple(
     + " erode_mask_value"
     + " smooth_mask_value"
     + " face_detector_threshold"
-    + " specific_latent_match_threshold",
+    + " specific_latent_match_threshold"
+    + " enhance_output",
 )
 
 if __name__ == "__main__":
@@ -132,6 +137,7 @@ if __name__ == "__main__":
         face_id_weights="weights/arcface_net.jit",
         parsing_model_weights="weights/79999_iter.pth",
         simswap_weights="weights/latest_net_G.pth",
+        gfpgan_weights="weights/GFPGANv1.4_ema.pth",
         device="cuda",
         crop_size=224,
         checkpoint_type="official_224",
@@ -140,6 +146,7 @@ if __name__ == "__main__":
         smooth_mask_value=41,
         face_detector_threshold=0.6,
         specific_latent_match_threshold=0.05,
+        enhance_output=True
     )
 
     model = load_model(config)

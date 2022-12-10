@@ -42,9 +42,7 @@ class Application:
                 src_data=att_video_path, output_dir=output_dir
             )
 
-        assert not (
-            self.att_video and self.att_image
-        ), "Only one attribute source can be used!"
+        assert not (self.att_video and self.att_image), "Only one attribute source can be used!"
 
         self.data_manager = self.att_video if self.att_video else self.att_image
 

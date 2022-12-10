@@ -118,7 +118,7 @@ Config files contain two main parts:
   - *smooth_mask_value* - an odd non-zero value. It's used for smoothing edges of the post-processing mask. Usually is set to *erode_mask_value* + 1.
   - *face_detector_threshold* - values in range [0.0...1.0]. Higher value reduces probability of FP detections but increases the probability of FN.
   - *specific_latent_match_threshold* - values in range [0.0...inf]. Usually takes small values around 0.05.
-  - *enhance_output* - whether apply GFPGAN model or not as a post-processing step.
+  - *enhance_output* - whether to apply GFPGAN model or not as a post-processing step.
 
 ### Examples of post-processing mask
 

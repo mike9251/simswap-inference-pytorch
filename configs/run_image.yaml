@@ -18,6 +18,7 @@ pipeline:
   face_alignment_type: "none" #"ffhq"
   erode_mask_value: 40
   smooth_mask_value: 41
+  sigma_scale_value: 1.0
   face_detector_threshold: 0.6
   specific_latent_match_threshold: 0.05
   enhance_output: True

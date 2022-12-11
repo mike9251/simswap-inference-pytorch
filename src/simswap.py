@@ -35,6 +35,7 @@ class SimSwap:
         self.face_alignment_type: Union[FaceAlignmentType, None] = None
         self.erode_mask_value: Union[int, None] = None
         self.smooth_mask_value: Union[int, None] = None
+        self.sigma_scale_value: Union[float, None] = None
         self.face_detector_threshold: Union[float, None] = None
         self.specific_latent_match_threshold: Union[float, None] = None
         self.device = torch.device(config.device)
@@ -122,6 +123,7 @@ class SimSwap:
         self.set_specific_latent_match_threshold(config.specific_latent_match_threshold)
         self.set_erode_mask_value(config.erode_mask_value)
         self.set_smooth_mask_value(config.smooth_mask_value)
+        self.set_sigma_scale_value(config.sigma_scale_value)
 
     def set_crop_size(self, crop_size: int) -> None:
         if crop_size < 0:
@@ -173,6 +175,12 @@ class SimSwap:
         smooth_mask_value += 1 if smooth_mask_value % 2 == 0 else 0
 
         self.smooth_mask_value = smooth_mask_value
+
+    def set_sigma_scale_value(self, sigma_scale_value: float) -> None:
+        if sigma_scale_value < 0 or sigma_scale_value > 1.0:
+            raise "Invalid sigma_scale_value! Must be within 0...1 range."
+
+        self.sigma_scale_value = sigma_scale_value
 
     def run_detect_align(self, image: np.ndarray, for_id: bool = False) -> Tuple[Union[Iterable[np.ndarray], None],
                                                                                  Union[Iterable[np.ndarray], None],
@@ -336,7 +344,8 @@ class SimSwap:
             kernel_size = (self.smooth_mask_value, self.smooth_mask_value)
             # https://docs.opencv.org/4.x/d4/d86/group__imgproc__filter.html#gaabe8c836e97159a9193fb0b11ac52cf1
             # https://docs.opencv.org/4.x/d4/d86/group__imgproc__filter.html#gac05a120c1ae92a6060dd0db190a61afa
-            sigma = 2 * 0.3 * ((kernel_size[0] - 1) * 0.5 - 1) + 0.8
+            sigma = 0.3 * ((kernel_size[0] - 1) * 0.5 - 1) + 0.8
+            sigma *= self.sigma_scale_value
             img_mask = kornia.filters.gaussian_blur2d(img_mask, kernel_size, (sigma, sigma), border_type='constant',
                                                       separable=True)
 

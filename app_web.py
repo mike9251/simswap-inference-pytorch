@@ -41,6 +41,8 @@ def run(model):
             label="smooth_mask_value", min_value=1, max_value=61, step=2, value=41
         )
 
+        sigma_scale_value = st.slider(label="sigma_scale_value", min_value=0.01, max_value=1.0, step=0.01, value=1.0)
+
         specific_latent_match_threshold = st.slider(
             label="specific_latent_match_threshold",
             min_value=0.0,
@@ -75,6 +77,7 @@ def run(model):
         model.set_face_alignment_type(face_alignment_type)
         model.set_erode_mask_value(erode_mask_value)
         model.set_smooth_mask_value(smooth_mask_value)
+        model.set_sigma_scale_value(sigma_scale_value)
         model.set_specific_latent_match_threshold(specific_latent_match_threshold)
         model.enhance_output = True if enhance_output == "yes" else False
 
@@ -126,6 +129,7 @@ Config = namedtuple(
     + " face_alignment_type"
     + " erode_mask_value"
     + " smooth_mask_value"
+    + " sigma_scale_value"
     + " face_detector_threshold"
     + " specific_latent_match_threshold"
     + " enhance_output",
@@ -144,6 +148,7 @@ if __name__ == "__main__":
         face_alignment_type="none",
         erode_mask_value=40,
         smooth_mask_value=41,
+        sigma_scale_value=1.0,
         face_detector_threshold=0.6,
         specific_latent_match_threshold=0.05,
         enhance_output=True

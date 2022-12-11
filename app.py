@@ -39,7 +39,7 @@ class Application:
         self.att_video: Optional[VideoDataManager] = None
         if att_video_path and att_video_path.is_file():
             self.att_video: Optional[VideoDataManager] = VideoDataManager(
-                src_data=att_video_path, output_dir=output_dir
+                src_data=att_video_path, output_dir=output_dir, clean_work_dir=config.data.clean_work_dir
             )
 
         assert not (self.att_video and self.att_image), "Only one attribute source can be used!"

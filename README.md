@@ -103,6 +103,7 @@ Config files contain two main parts:
   - *att_image* - target image, attributes of the person on this image will be mixed with the person's identity from the source image. Here you can also specify a folder with multiple images - identity translation will be applied to all images in the folder.
   - *specific_id_image* - a specific person on the *att_image* you would like to replace, leaving others untouched (if there're any other person).
   - *att_video* - the same as *att_image*
+  - *clean_work_dir* - whether remove temp folder with images or not (for video configs only).
 
 
 - **pipeline**
@@ -117,6 +118,7 @@ Config files contain two main parts:
   - *face_alignment_type* - affects reference face key points coordinates. **Possible values are "ffhq" and "none". Try both of them to see which one works better for your data.**
   - *erode_mask_value* - a non-zero value. It's used for the post-processing mask size attenuation. You might want to play with this parameter.
   - *smooth_mask_value* - an odd non-zero value. It's used for smoothing edges of the post-processing mask. Usually is set to *erode_mask_value* + 1.
+  - *sigma_scale_value* - controls the amount of blur added to the post-processing mask. Valid values are in range [0.01...1.0]. Tune it if yuo see artifacts around swapped faces (some rectangles).
   - *face_detector_threshold* - values in range [0.0...1.0]. Higher value reduces probability of FP detections but increases the probability of FN.
   - *specific_latent_match_threshold* - values in range [0.0...inf]. Usually takes small values around 0.05.
   - *enhance_output* - whether to apply GFPGAN model or not as a post-processing step.

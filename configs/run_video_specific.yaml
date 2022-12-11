@@ -4,6 +4,7 @@ data:
   specific_id_image: "${hydra:runtime.cwd}/demo_file/specific1.png"
   att_video: "${hydra:runtime.cwd}/demo_file/multi_people_1080p.mp4"
   output_dir: ${hydra:runtime.cwd}/output
+  clean_work_dir: True
 
 pipeline:
   face_detector_weights: "${hydra:runtime.cwd}/weights/face_detector_scrfd_10g_bnkps.onnx"
@@ -18,6 +19,7 @@ pipeline:
   face_alignment_type: "none" #"ffhq"
   erode_mask_value: 40
   smooth_mask_value: 41
+  sigma_scale_value: 1.0
   face_detector_threshold: 0.6
   specific_latent_match_threshold: 0.05
   enhance_output: True

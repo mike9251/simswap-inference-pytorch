@@ -57,9 +57,11 @@ class Application:
 
             att_img = self.data_manager.get()
 
-            output = self.model(att_img)
-
-            self.data_manager.save(output)
+            try:
+                output = self.model(att_img)
+                self.data_manager.save(output)
+            except:
+                print("skipped frame")
 
 
 @hydra.main(config_path="configs/", config_name="run_image.yaml")

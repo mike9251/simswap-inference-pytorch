@@ -284,15 +284,15 @@ class SimSwap:
         )
         align_att_img_batch = align_att_img_batch.to(self.device, non_blocking=True)
 
-        n, c, h, w = align_att_img_batch.shape
-        img_white = torch.zeros((n, 1, h, w), dtype=align_att_img_batch.dtype, device=self.device) + 255.0
-
-        inv_att_transforms: torch.Tensor = inverse_transform_batch(att_transforms)
-
         # Get face masks for the attribute image
         face_mask, ignore_mask_ids = self.bise_net.get_mask(
             align_att_img_batch_for_parsing_model, self.crop_size
         )
+
+        n, c, h, w = align_att_img_batch.shape
+        img_white = torch.zeros((n, 1, h, w), dtype=align_att_img_batch.dtype, device=self.device) + 255.0
+
+        inv_att_transforms: torch.Tensor = inverse_transform_batch(att_transforms)
 
         soft_face_mask, _ = self.smooth_mask(face_mask)
 
@@ -305,10 +305,6 @@ class SimSwap:
         frame_size = (att_image.shape[0], att_image.shape[1])
 
         att_image = self.to_tensor(att_image).to(self.device, non_blocking=True)
-
-        if torch.sum(ignore_mask_ids.int()) > 0:
-            img_white = img_white[ignore_mask_ids, ...]
-            inv_att_transforms = inv_att_transforms[ignore_mask_ids, ...]
 
         # to avoid OOM apply erosion on low res masks
         img_white = F.pad(img_white, (self.erode_mask_value, self.erode_mask_value, self.erode_mask_value, self.erode_mask_value))

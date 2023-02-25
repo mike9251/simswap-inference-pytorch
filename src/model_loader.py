@@ -10,6 +10,8 @@ from src.FaceId.faceid import FaceId
 from src.Generator.fs_networks_fix import Generator_Adain_Upsample
 from src.PostProcess.ParsingModel.model import BiSeNet
 from src.PostProcess.GFPGAN.gfpgan import GFPGANer
+from src.Blend.blend import BlendModule
+
 
 model = namedtuple("model", ["url", "model"])
 
@@ -38,6 +40,10 @@ models = {
         url="https://github.com/mike9251/simswap-inference-pytorch/releases/download/v1.1/GFPGANv1.4_ema.pth",
         model=GFPGANer,
     ),
+    "blend_module": model(
+        url="https://github.com/mike9251/simswap-inference-pytorch/releases/download/v1.2/blend_module.jit",
+        model=BlendModule
+    )
 }
 
 
@@ -94,6 +100,7 @@ def get_model(
                 )
 
         kwargs.update({"model_path": str(dst_path), "device": device})
+
         model = models[model_name].model(**kwargs)
 
     return model

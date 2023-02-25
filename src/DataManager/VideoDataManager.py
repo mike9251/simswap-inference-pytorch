@@ -30,6 +30,7 @@ class VideoDataManager(BaseDataManager):
                 self.audio_handle = AudioFileClip(str(src_data))
 
             self.video_handle = cv2.VideoCapture(str(src_data))
+            self.video_handle.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
             self.frame_count = int(self.video_handle.get(cv2.CAP_PROP_FRAME_COUNT))
             self.fps = self.video_handle.get(cv2.CAP_PROP_FPS)

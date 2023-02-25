@@ -33,15 +33,15 @@ def run(model):
 
         enhance_output = st.radio("Enhance output:", ("yes", "no"))
 
-        erode_mask_value = st.slider(
-            label="erode_mask_value", min_value=3, max_value=60, step=1, value=40
+        smooth_mask_iter = st.slider(
+            label="smooth_mask_iter", min_value=1, max_value=60, step=1, value=7
         )
 
-        smooth_mask_value = st.slider(
-            label="smooth_mask_value", min_value=1, max_value=61, step=2, value=41
+        smooth_mask_kernel_size = st.slider(
+            label="smooth_mask_kernel_size", min_value=1, max_value=61, step=2, value=17
         )
 
-        sigma_scale_value = st.slider(label="sigma_scale_value", min_value=0.01, max_value=1.0, step=0.01, value=1.0)
+        smooth_mask_threshold = st.slider(label="smooth_mask_threshold", min_value=0.01, max_value=1.0, step=0.01, value=0.9)
 
         specific_latent_match_threshold = st.slider(
             label="specific_latent_match_threshold",
@@ -75,9 +75,9 @@ def run(model):
 
     if id_image is not None and attr_image is not None:
         model.set_face_alignment_type(face_alignment_type)
-        model.set_erode_mask_value(erode_mask_value)
-        model.set_smooth_mask_value(smooth_mask_value)
-        model.set_sigma_scale_value(sigma_scale_value)
+        model.set_smooth_mask_iter(smooth_mask_iter)
+        model.set_smooth_mask_kernel_size(smooth_mask_kernel_size)
+        model.set_smooth_mask_threshold(smooth_mask_threshold)
         model.set_specific_latent_match_threshold(specific_latent_match_threshold)
         model.enhance_output = True if enhance_output == "yes" else False
 
@@ -123,13 +123,14 @@ Config = namedtuple(
     + " parsing_model_weights"
     + " simswap_weights"
     + " gfpgan_weights"
+    + " blend_module_weights"
     + " device"
     + " crop_size"
     + " checkpoint_type"
     + " face_alignment_type"
-    + " erode_mask_value"
-    + " smooth_mask_value"
-    + " sigma_scale_value"
+    + " smooth_mask_iter"
+    + " smooth_mask_kernel_size"
+    + " smooth_mask_threshold"
     + " face_detector_threshold"
     + " specific_latent_match_threshold"
     + " enhance_output",
@@ -142,13 +143,14 @@ if __name__ == "__main__":
         parsing_model_weights="weights/79999_iter.pth",
         simswap_weights="weights/latest_net_G.pth",
         gfpgan_weights="weights/GFPGANv1.4_ema.pth",
+        blend_module_weights="weights/blend.jit",
         device="cuda",
         crop_size=224,
         checkpoint_type="official_224",
         face_alignment_type="none",
-        erode_mask_value=40,
-        smooth_mask_value=41,
-        sigma_scale_value=1.0,
+        smooth_mask_iter=7,
+        smooth_mask_kernel_size=17,
+        smooth_mask_threshold=0.9,
         face_detector_threshold=0.6,
         specific_latent_match_threshold=0.05,
         enhance_output=True

@@ -1,4 +1,3 @@
-import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -24,31 +23,23 @@ class SimSwap:
         specific_image: Union[np.ndarray, None] = None,
     ):
 
-        self.id_image: np.ndarray | None = id_image
-        self.id_latent: torch.Tensor | None = None
-        self.specific_id_image: np.ndarray | None = specific_image
-        self.specific_latent: torch.Tensor | None = None
+        self.id_image: Union[np.ndarray, None] = id_image
+        self.id_latent: Union[torch.Tensor,  None] = None
+        self.specific_id_image: Union[np.ndarray,  None] = specific_image
+        self.specific_latent: Union[torch.Tensor,  None] = None
 
         self.use_mask: Union[bool, None] = True
         self.crop_size: Union[int, None] = None
-        self.checkpoint_type: Union[CheckpointType, None] = None
-        self.face_alignment_type: Union[FaceAlignmentType, None] = None
-        self.erode_mask_value: Union[int, None] = None
-        self.smooth_mask_value: Union[int, None] = None
-        self.sigma_scale_value: Union[float, None] = None
-        self.face_detector_threshold: Union[float, None] = None
-        self.specific_latent_match_threshold: Union[float, None] = None
+        self.checkpoint_type: Union[CheckpointType,  None] = None
+        self.face_alignment_type: Union[FaceAlignmentType,  None] = None
+        self.smooth_mask_iter: Union[int,  None] = None
+        self.smooth_mask_kernel_size: Union[int,  None] = None
+        self.smooth_mask_threshold: Union[float,  None] = None
+        self.face_detector_threshold: Union[float,  None] = None
+        self.specific_latent_match_threshold: Union[float,  None] = None
         self.device = torch.device(config.device)
 
         self.set_parameters(config)
-
-        self.use_erosion = True
-        if self.erode_mask_value == 0:
-            self.use_erosion = False
-
-        self.use_blur = True
-        if self.smooth_mask_value == 0:
-            self.use_erosion = False
 
         # For BiSeNet and for official_224 SimSwap
         self.to_tensor_normalize = transforms.Compose(
@@ -102,8 +93,11 @@ class SimSwap:
             else False,
         )
 
-        self.smooth_mask = SoftErosion(kernel_size=17, threshold=0.9, iterations=7).to(
-            self.device
+        self.blend = get_model(
+            "blend_module",
+            device=self.device,
+            load_state_dice=False,
+            model_path=Path(config.blend_module_weights)
         )
 
         self.enhance_output = config.enhance_output
@@ -121,9 +115,9 @@ class SimSwap:
         self.set_face_alignment_type(config.face_alignment_type)
         self.set_face_detector_threshold(config.face_detector_threshold)
         self.set_specific_latent_match_threshold(config.specific_latent_match_threshold)
-        self.set_erode_mask_value(config.erode_mask_value)
-        self.set_smooth_mask_value(config.smooth_mask_value)
-        self.set_sigma_scale_value(config.sigma_scale_value)
+        self.set_smooth_mask_kernel_size(config.smooth_mask_kernel_size)
+        self.set_smooth_mask_threshold(config.smooth_mask_threshold)
+        self.set_smooth_mask_iter(config.smooth_mask_iter)
 
     def set_crop_size(self, crop_size: int) -> None:
         if crop_size < 0:
@@ -162,25 +156,29 @@ class SimSwap:
 
         self.specific_latent_match_threshold = specific_latent_match_threshold
 
-    def set_erode_mask_value(self, erode_mask_value: int) -> None:
-        if erode_mask_value < 0:
-            raise "Invalid erode_mask_value! Must be a positive value."
+    def re_initialize_soft_mask(self):
+        self.smooth_mask = SoftErosion(kernel_size=self.smooth_mask_kernel_size,
+                                       threshold=self.smooth_mask_threshold,
+                                       iterations=self.smooth_mask_iter).to(self.device)
 
-        self.erode_mask_value = erode_mask_value
+    def set_smooth_mask_kernel_size(self, smooth_mask_kernel_size: int) -> None:
+        if smooth_mask_kernel_size < 0:
+            raise "Invalid smooth_mask_kernel_size! Must be a positive value."
+        smooth_mask_kernel_size += 1 if smooth_mask_kernel_size % 2 == 0 else 0
+        self.smooth_mask_kernel_size = smooth_mask_kernel_size
+        self.re_initialize_soft_mask()
 
-    def set_smooth_mask_value(self, smooth_mask_value: int) -> None:
-        if smooth_mask_value < 0:
-            raise "Invalid smooth_mask_value! Must be a positive value."
+    def set_smooth_mask_threshold(self, smooth_mask_threshold: int) -> None:
+        if smooth_mask_threshold < 0 or smooth_mask_threshold > 1.0:
+            raise "Invalid smooth_mask_threshold! Must be within 0...1 range."
+        self.smooth_mask_threshold = smooth_mask_threshold
+        self.re_initialize_soft_mask()
 
-        smooth_mask_value += 1 if smooth_mask_value % 2 == 0 else 0
-
-        self.smooth_mask_value = smooth_mask_value
-
-    def set_sigma_scale_value(self, sigma_scale_value: float) -> None:
-        if sigma_scale_value < 0 or sigma_scale_value > 1.0:
-            raise "Invalid sigma_scale_value! Must be within 0...1 range."
-
-        self.sigma_scale_value = sigma_scale_value
+    def set_smooth_mask_iter(self, smooth_mask_iter: float) -> None:
+        if smooth_mask_iter < 0:
+            raise "Invalid smooth_mask_iter! Must be a positive value.."
+        self.smooth_mask_iter = smooth_mask_iter
+        self.re_initialize_soft_mask()
 
     def run_detect_align(self, image: np.ndarray, for_id: bool = False) -> Tuple[Union[Iterable[np.ndarray], None],
                                                                                  Union[Iterable[np.ndarray], None],
@@ -289,45 +287,28 @@ class SimSwap:
             align_att_img_batch_for_parsing_model, self.crop_size
         )
 
-        n, c, h, w = align_att_img_batch.shape
-        img_white = torch.zeros((n, 1, h, w), dtype=align_att_img_batch.dtype, device=self.device) + 255.0
-
         inv_att_transforms: torch.Tensor = inverse_transform_batch(att_transforms)
 
         soft_face_mask, _ = self.smooth_mask(face_mask)
 
-        # Only take face area from the swapped image
-        swapped_img = swapped_img * soft_face_mask + align_att_img_batch * (
-            1 - soft_face_mask
-        )
         swapped_img[ignore_mask_ids, ...] = align_att_img_batch[ignore_mask_ids, ...]
 
         frame_size = (att_image.shape[0], att_image.shape[1])
 
-        att_image = self.to_tensor(att_image).to(self.device, non_blocking=True)
+        att_image = self.to_tensor(att_image).to(self.device, non_blocking=True).unsqueeze(0)
 
-        # to avoid OOM apply erosion on low res masks
-        img_white = F.pad(img_white, (self.erode_mask_value, self.erode_mask_value, self.erode_mask_value, self.erode_mask_value))
-
-        if self.use_erosion:
-            kernel = torch.ones((self.erode_mask_value, self.erode_mask_value), dtype=torch.float32, device=self.device)
-            img_white = kornia.morphology.erosion(img_white, kernel, structuring_element=None, origin=None, border_type='geodesic', border_value=0.0, max_val=255.0, engine='convolution')
-
-        img_white = img_white[:, :, self.erode_mask_value:-self.erode_mask_value, self.erode_mask_value:-self.erode_mask_value]
-
-        # Place swapped faces and masks where they should be in the original frame
         target_image = kornia.geometry.transform.warp_affine(
             swapped_img,
             inv_att_transforms,
             frame_size,
             mode="bilinear",
-            padding_mode="zeros",
+            padding_mode="border",
             align_corners=True,
             fill_value=torch.zeros(3),
         )
 
-        img_mask = kornia.geometry.transform.warp_affine(
-            img_white,
+        soft_face_mask = kornia.geometry.transform.warp_affine(
+            soft_face_mask,
             inv_att_transforms,
             frame_size,
             mode="bilinear",
@@ -336,24 +317,6 @@ class SimSwap:
             fill_value=torch.zeros(3),
         )
 
-        if self.use_blur:
-            kernel_size = (self.smooth_mask_value, self.smooth_mask_value)
-            # https://docs.opencv.org/4.x/d4/d86/group__imgproc__filter.html#gaabe8c836e97159a9193fb0b11ac52cf1
-            # https://docs.opencv.org/4.x/d4/d86/group__imgproc__filter.html#gac05a120c1ae92a6060dd0db190a61afa
-            sigma = 0.3 * ((kernel_size[0] - 1) * 0.5 - 1) + 0.8
-            sigma *= self.sigma_scale_value
-            img_mask = kornia.filters.gaussian_blur2d(img_mask, kernel_size, (sigma, sigma), border_type='constant',
-                                                      separable=True)
+        result = self.blend(target_image, soft_face_mask, att_image)
 
-        # Collect masks for all crops
-        img_mask = torch.sum(img_mask, dim=0, keepdim=True)
-
-        img_mask /= 255.0
-        img_mask = torch.clamp(img_mask, 0.0, 1.0)
-
-        # Collect all swapped crops
-        target_image = torch.sum(target_image, dim=0, keepdim=True)
-
-        result = tensor2img(img_mask * target_image + (1 - img_mask) * att_image)
-
-        return result
+        return tensor2img(result)

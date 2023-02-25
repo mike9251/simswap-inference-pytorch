@@ -1,6 +1,8 @@
 # Unofficial Pytorch implementation (**inference only**) of the SimSwap: An Efficient Framework For High Fidelity Face Swapping
 
 ## Updates
+- improved performance (up to 40% in some scenarios, it depends on frame resolution and number of swaps per frame).
+- fixed a problem with overlapped areas from close faces (https://github.com/mike9251/simswap-inference-pytorch/issues/21)
 - added support for using GFPGAN model as an additional post-processing step to improve final image quality
 - added a toy gui app. Might be useful to understand how different pipeline settings affect output
 
@@ -67,6 +69,7 @@ You can also download weights manually and put inside `weights` folder:
 - weights/<a href="https://github.com/mike9251/simswap-inference-pytorch/releases/download/weights/simswap_224_latest_net_G.pth">simswap_224_latest_net_G.pth</a> - official 224x224 model
 - weights/<a href="https://github.com/mike9251/simswap-inference-pytorch/releases/download/weights/simswap_512_390000_net_G.pth">simswap_512_390000_net_G.pth</a> - unofficial 512x512 model (I took it <a href="https://github.com/neuralchen/SimSwap/issues/255">here</a>).
 - weights/<a href="https://github.com/mike9251/simswap-inference-pytorch/releases/download/v1.1/GFPGANv1.4_ema.pth">GFPGANv1.4_ema.pth</a>
+- weights/<a href="https://github.com/mike9251/simswap-inference-pytorch/releases/download/v1.2/blend_module.jit">blend_module.jit</a>
 
 ## Inference
 ### Web App
@@ -116,36 +119,13 @@ Config files contain two main parts:
   - *crop_size* - size of images SimSwap models works with.
   - *checkpoint_type* - the official model works with 224x224 crops and has different pre/post processings (imagenet like). Latest official repository allows you to train your own models, but the architecture and pre/post processings are slightly different (1. removed Tanh from the last layer; 2. normalization to [0...1] range). **If you run the official 224x224 model then set this parameter to "official_224", otherwise "none".**
   - *face_alignment_type* - affects reference face key points coordinates. **Possible values are "ffhq" and "none". Try both of them to see which one works better for your data.**
-  - *erode_mask_value* - a non-zero value. It's used for the post-processing mask size attenuation. You might want to play with this parameter.
-  - *smooth_mask_value* - an odd non-zero value. It's used for smoothing edges of the post-processing mask. Usually is set to *erode_mask_value* + 1.
-  - *sigma_scale_value* - controls the amount of blur added to the post-processing mask. Valid values are in range [0.01...1.0]. Tune this parameter if there are artifacts around swapped faces (some rectangles).
+  - *smooth_mask_kernel_size* - a non-zero value. It's used for the post-processing mask size attenuation. You might want to play with this parameter.
+  - *smooth_mask_iter* - a non-zero value. The number of times a face mask is smoothed.
+  - *smooth_mask_threshold* - controls the face mask saturation. Valid values are in range [0.0...1.0]. Tune this parameter if there are artifacts around swapped faces.
   - *face_detector_threshold* - values in range [0.0...1.0]. Higher value reduces probability of FP detections but increases the probability of FN.
   - *specific_latent_match_threshold* - values in range [0.0...inf]. Usually takes small values around 0.05.
   - *enhance_output* - whether to apply GFPGAN model or not as a post-processing step.
 
-### Examples of post-processing mask
-
-<details>
-<summary><b>Effect of the erode_mask_value</b></summary>
-
-erode_mask_value = 0
-![img_mask_erode_0.jpg](Docs/pics/img_mask_erode_0.jpg "erode_mask_value = 0")
-erode_mask_value = 20
-![img_mask_erode_20.jpg](Docs/pics/img_mask_erode_20.jpg "erode_mask_value = 20")
-erode_mask_value = 40
-![img_mask_erode_40.jpg](Docs/pics/img_mask_erode_40.jpg "erode_mask_value = 40")
-</details>
-
-<details>
-<summary><b>Effect of the smooth_mask_value</b></summary>
-
-smooth_mask_value = 21
-![img_mask_blur_21.jpg](Docs/pics/img_mask_blur_21.jpg "smooth_mask_value = 21")
-smooth_mask_value = 41
-![img_mask_blur_41.jpg](Docs/pics/img_mask_blur_41.jpg "smooth_mask_value = 41")
-smooth_mask_value = 61
-![img_mask_blur_41.jpg](Docs/pics/img_mask_blur_61.jpg "smooth_mask_value = 61")
-</details>
 
 ### Overriding parameters with CMD
 Every parameter in a config file can be overridden by specifying it directly with CMD. For example:

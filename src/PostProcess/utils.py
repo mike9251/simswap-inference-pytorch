@@ -26,7 +26,6 @@ class SoftErosion(torch.nn.Module):
         self.register_buffer("weight", kernel)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        x = x.float()
         for i in range(self.iterations - 1):
             x = torch.min(
                 x,
@@ -37,8 +36,10 @@ class SoftErosion(torch.nn.Module):
         x = F.conv2d(x, weight=self.weight, groups=x.shape[1], padding=self.padding)
 
         mask = x >= self.threshold
+
         x[mask] = 1.0
-        x[~mask] /= x[~mask].max()
+        # add small epsilon to avoid Nans
+        x[~mask] /= (x[~mask].max() + 1e-7)
 
         return x, mask
 
